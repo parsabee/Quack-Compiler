@@ -3,13 +3,13 @@ a compiler for Quack, an object oriented statically typed language with type inf
 Work in progress...
 
 ### Build
-'''
+```
 mkdir build
 cd build
 cmake ..
 cmake --build .
-'''
+```
 ### execute
-'''
+```
 ./qkc <.qk file>
-'''
+```
