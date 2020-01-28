@@ -1,0 +1,120 @@
+%{
+    #include "all.hpp"
+    #include "parser.hpp"
+    /* Some long messages that don't fit well in the code below */
+    std::string BAD_ESC_MSG =
+      "*** illegal escape code, only \\\\, \\0, \\t, \\n, \\r, \\n are permitted";
+    std::string BAD_NL_STR =
+      "*** unclosed string"; 
+    /* Some strings can't be matched in one gulp.  We need
+     * a buffer in which to assemble them from parts.
+     */
+    std::string string_buf = "";
+    #define YY_USER_ACTION yylloc.first_line = yylineno;
+    bool t = true;
+%}
+
+%option noyywrap
+%option yylineno
+%option nounput
+
+%x comment
+%x tripleq
+%x string_lit
+
+%%
+  /* We BEGIN with some tokens that are not value-bearing,
+   * i.e., the parser needs to know only which token was matched.
+   */
+
+  /* Multi-character punctuation with names */
+==                              { return EQUALS; }
+[<]=                            { return ATMOST; }
+[>]=                            { return ATLEAST; }
+   /* Single character punctuation.  Because a character
+    * in C or C++ can be treated as an integer, Bison lets
+    * us return a character as a token.
+    * JFlex/Cup do not let you do this in Java.
+    */
+[-+*/:.{}=<>();,]               { return yytext[0]; }
+  /* Keywords are essentially another kind of punctuation,
+   * but since they also match the identifier pattern, we
+   * need to be sure we give their patterns *before* the
+   * identifier pattern.  Most scanner generators work this
+   * way, but WARNING for Python PLY users:  PLY prioritizes
+   * by length of the regular expression!
+   */
+class                           { return CLASS; }
+def                             { return DEF; }
+extends                         { return EXTENDS; }
+if                              { return IF; }
+elif                            { return ELIF; }
+else                            { return ELSE; }
+while                           { return WHILE; }
+return                          { return RETURN; }
+typecase                        { return TYPECASE; }
+and                             { return AND; }
+or                              { return OR; }
+not                             { return NOT; }
+
+   /* The following tokens are value-bearing:
+    * We pass a value back to the parser by copying
+    * it into the yylval parameter.  The parser
+    * expects string values for identifiers and
+    * string literals in yylval.str.  It expects integer
+    * values for integer literals in yylval.num.
+    */
+[a-zA-Z_][a-zA-Z0-9_]*          { yylval.str = strdup(yytext); return IDENT; }
+[0-9]+                          { yylval.num = atoi(yytext); return INT_LIT; }
+
+  /* Strings, single and triple-quoted */
+\"                              { string_buf = ""; BEGIN string_lit; }
+<string_lit>[^\n\t\\"]+         { string_buf += yytext; }
+<string_lit>\\n                 { string_buf += "\n"; }
+<string_lit>\\t                 { string_buf += "\t"; } /* etc */
+<string_lit>\\.                 { fprintf(stderr, "%s\n", BAD_ESC_MSG.c_str()); 
+                                  if (t) {
+                                    BAD_ESC_MSG = "*** illegal escape code";
+                                    t = false;
+                                  }
+                                }
+<string_lit>\n                  { BEGIN INITIAL;
+                                  fprintf(stderr, "%s\n", BAD_NL_STR.c_str());
+                                  yylval.str = strdup(string_buf.c_str());
+                                  return STRING_LIT; }
+<string_lit>\"                  { BEGIN INITIAL;
+                                  yylval.str = strdup(string_buf.c_str());
+                                  return STRING_LIT; }
+  /* Triple-quoted strings.  Not all in one gulp.
+   * When we see """, we enter an exclusive state in which
+   * anything other than """ is added to a buffer.  Only
+   * another """ breaks us out of that state.
+   */
+["]["]["]                       { BEGIN tripleq;  string_buf = ""; }
+
+   /* The following pattern is basically zero or more occurrences of
+    *    - Anything that isn't a quote
+    *    - Or one quote followed by something else
+    *    - Or two quotes followed by something else
+    */
+<tripleq>(([^"])|(["][^"])|(["]["][^"])|\n)* { 
+                                  string_buf += yytext; }
+                                  
+    /* When we get the ending triple-quote, we return the
+     * assembled buffer.
+     */
+<tripleq>["]["]["]              { yylval.str = strdup(string_buf.c_str());
+                                  BEGIN INITIAL;
+                                  return STRING_LIT; }
+  /* Ignore whitespace */
+[ \t\n]*                        { ; }
+   /* Multi-line comments */ 
+[/][*]                          { BEGIN comment; }
+<comment>[^*]*                  { ; }
+<comment>[*][^/]                { ; }
+<comment>[*][/]                 { BEGIN INITIAL; }
+   /* Line end comments */
+[/][/].*                        { ; }
+.                               { fprintf(stderr, "*** unexpected character in line\n"); }
+<<EOF>>                         { return EOF; }
+%%

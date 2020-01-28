@@ -1,0 +1,404 @@
+%code requires {
+    #include "all.hpp"
+    #include "ast_node.hpp"
+    int yylex();
+    void yyerror(const char *msg);
+}
+
+%code {
+    #include "msg.hpp"
+    int report::num_errors = 0;
+    ast::ASTNode *root = nullptr; /* root of AST */
+    void yyerror(const char *msg) {
+      report::num_errors++;
+      fprintf(stderr, "%d: %s\n\n", yylloc.first_line, msg);
+    }
+    int yylex_destroy();
+}
+
+%locations
+%defines
+%define parse.error verbose
+
+%union {
+    /* Tokens */
+    int   num;
+    char*  str;
+    /* Abstract syntax tree values */
+    ast::ASTNode* node;
+    ast::Class* clazz;
+    ast::Ident* ident;
+    ast::LExpr* l_expr;
+    ast::Load*  load;
+    ast::Formal* formal;
+    ast::Method* method;
+    ast::Statement* statement;
+    ast::Expr* expr;
+    ast::Methods* methods;
+    ast::Formals* formals;
+    ast::Actuals* actuals;
+    ast::Block* block;
+    ast::Classes* classes;
+    ast::Type_Alternatives* type_alternatives;
+}
+
+/* -----------------------------------------
+ * Associate non-terminals with classes in
+ * the abstract syntax tree (ast)
+ * -----------------------------------------
+ */
+%type <l_expr> l_expr
+%type <expr> expr
+%type <statement> statement
+%type <node> pgm
+%type <formal> formal
+%type <classes> classes
+%type <block> statements statement_block
+%type <type_alternatives> type_alternatives
+%type <actuals> actual_args actual_args_nonempty
+%type <formals> formals formals_nonempty
+%type <methods> methods
+%type <method> method
+%type <ident>  optReturnType
+%type <block>  opt_elif_parts
+%type <clazz> class
+%type <ident> ident optExtends
+
+/* -------------------------------------------
+ * Tokens.
+ * -------------------------------------------
+ */
+/* Keywords (no semantic values) */
+%token CLASS
+%token DEF
+%token EXTENDS 
+%token IF ELIF ELSE
+%token WHILE
+%token RETURN
+%token TYPECASE
+
+ /* Multi-character punctuation (no semantic values) */
+%token ATLEAST ATMOST EQUALS
+%token AND OR NOT 
+
+/* Identifiers (semantic value is the identifier name) */
+%type <str> IDENT
+%token IDENT
+
+/* Literals (semantic value is the literal value) */
+%token INT_LIT STRING_LIT
+%type <str> STRING_LIT
+%type <num> INT_LIT
+
+/* Precedence of arithmetic operators
+ * and deref
+ */
+%left AND OR
+%left NOT
+%nonassoc ATMOST '>'
+%nonassoc ATLEAST '<'
+%left EQUALS
+%left '+' '-'
+%left '*' '/'
+%precedence NEG   /* Negation */ 
+%left '.'         /*  because a.b.c*d is ((a.b).c)*d */
+
+%start pgm
+%%
+/* *************************************
+ * Program Structure 
+ * *************************************
+ */ 
+
+/* A Quack program is a sequence of classes followed by some 
+ * statements.  The statements are the main program. 
+ */
+
+pgm: classes  statements            { $$ = new ast::Program($1, $2, @$.first_line); root = $$;
+                                      yylex_destroy(); }
+   ;
+
+/* Zero or more classes */
+classes: classes class              { $$ = $1; $$->append($2); }
+       | /* empty */                { $$ = new ast::Classes(@$.first_line); }
+       ;
+
+/* Zero or more statements 
+ * (although a program with zero statements is pretty boring) 
+ */
+statements: statements statement    { $$ = $1; $$->append($2); }
+          | /* empty */             { $$ = new ast::Block(@$.first_line); }
+          ;
+
+/*
+ * Note that we have statement terminators, not statement
+ * separators, so we don't need the hackery of distinguishing 
+ * between empty and non-empty lists --- the terminator 
+ * (modeled here as ';' although it may not be that in our 
+ * lexical structure) is part of each statement. 
+ * The structure of an individual statement is defined below. 
+ */ 
+
+class: CLASS ident '(' formals ')' optExtends '{' statements methods '}' {
+                                      ast::Ident *constructor_name = new ast::Ident($2->get_text(), @$.first_line);
+                                      ast::Ident *return_type = new ast::Ident($2->get_text(), @$.first_line);
+                                      ast::Method *constructor = new ast::Method(constructor_name, $4, return_type, $8, @$.first_line);
+                                      $$ = new ast::Class($2, $6, constructor, $9, @$.first_line); }
+     /* Error handling */
+     | CLASS ident error            { $$ = new ast::Class($2, nullptr, nullptr, nullptr, @$.first_line); }
+     | CLASS ident '(' formals error { 
+                                      ast::Ident *constructor_name = new ast::Ident(*$2);
+                                      ast::Ident *return_type = new ast::Ident(*$2);
+                                      ast::Method *constructor = new ast::Method(constructor_name, $4, return_type, nullptr, @$.first_line);
+                                      $$ = new ast::Class($2, nullptr, constructor, nullptr, @$.first_line); }
+     | CLASS ident '(' formals ')' optExtends error {
+                                      ast::Ident *constructor_name = new ast::Ident(*$2);
+                                      ast::Ident *return_type = new ast::Ident(*$2);
+                                      ast::Method *constructor = new ast::Method(constructor_name, $4, return_type, nullptr, @$.first_line);
+                                      $$ = new ast::Class($2, $6, constructor, nullptr, @$.first_line); }
+     ;
+
+optExtends: EXTENDS ident           { $$ = $2; }
+          | /* empty */             { $$ = new ast::Ident("Obj", @$.first_line); }
+          ;
+
+/* A list of varname: typename pairs separated by commas */
+formals: formals_nonempty           { $$ = $1; }
+       | /* empty */                { $$ = new ast::Formals(@$.first_line); }
+       ;
+
+formals_nonempty: formals_nonempty ',' formal { 
+                                      $$ = $1; $$->append($3); }
+                | formal            { $$ = new ast::Formals(@$.first_line); 
+                                      $$->append($1); }
+                ;
+
+/* variable: type */
+formal: ident ':' ident             { $$ = new ast::Formal($1, $3, @$.first_line); }
+      /* Error handling */
+      | ident error                 { $$ = new ast::Formal($1, nullptr, @$.first_line); }
+      ;
+
+/* The class body begins with statements that form the constructor, 
+ * and which implicitly declare the instance variables of the object. 
+ * These are followed by method declarations.  (Now pulled up into
+ * 'class' production to make it easier to treat the statements
+ * as a constructor.
+ */ 
+
+/* 0 or more methods */ 
+methods: methods method             { $$ = $1; $$->append($2); }
+       | /* empty */                { $$ = new ast::Methods( @$.first_line); }
+       ;
+
+method: DEF ident '(' formals ')' optReturnType statement_block { 
+                                      $$ = new ast::Method($2, $4, $6, $7, @$.first_line); }
+      /* Error handling */
+      | DEF error                   { $$ = nullptr; }
+      | DEF ident error             { $$ = new ast::Method($2, nullptr, nullptr, nullptr, @$.first_line); }
+      | DEF ident '(' formals error { $$ = new ast::Method($2, $4, nullptr, nullptr, @$.first_line); }
+      ;
+
+optReturnType: ':' ident            { $$ = $2; }
+             | /* empty */          { $$ = new ast::Ident("Nothing",@$.first_line); }
+             /* Error handling */
+             | ':' error            { $$ = nullptr; }
+             ;
+
+statement_block: '{' statements '}' { $$ = $2;}
+               /* Error handling */
+               | error              { $$ = nullptr; }
+               ;
+
+/* *************************************
+ * Statements: Control structure
+ * *************************************
+ */ 
+
+/* Conditional: 
+ *   if x < 0 
+ *     { x = x + 1; }
+ *   elif x > 10
+ *     { x = x - 3; }
+ *   else
+ *     { x = 0; }
+ */
+
+statement: IF expr statement_block  opt_elif_parts { 
+                                      $$ = new ast::If($2, $3, $4, @$.first_line); }
+         ;
+
+opt_elif_parts: ELIF expr statement_block  opt_elif_parts { 
+                                      $$ = new ast::Block(@$.first_line);
+                                      $$->append(new ast::If($2, $3, $4, @$.first_line)); }
+              | ELSE statement_block { 
+                                      $$ = $2; }
+              | /* empty */         { $$ = new ast::Block(@$.first_line); }
+              ;
+
+/* While loop: 
+ *  while e { statements } 
+ */
+
+statement: WHILE expr statement_block { 
+                                      $$ = new ast::While($2, $3, @$.first_line); }
+         ;
+
+/* ************************************
+ * Return statement
+ * ************************************
+ */
+
+statement: RETURN expr ';'          { $$ = new ast::Return($2, @$.first_line); }
+         | RETURN ';'               { $$ = new ast::Return(new ast::Ident("Nothing", @$.first_line), @$.first_line); }
+         ;
+
+/* *************************************
+ * A bare expression evaluated for effect
+ * can be a statement
+ * *************************************
+ */
+
+statement: expr ';'                 { $$ = $1; }
+		 | expr error               { $$ = nullptr; delete $1; }
+
+/* *************************************
+ * typecase added 2018 so that we can
+ * override EQUAL inherited from Obj
+ * *************************************
+ */
+statement: TYPECASE expr '{' type_alternatives '}' { 
+                                      $$ = new ast::Typecase($2, $4, @$.first_line); }
+         /* Error handling */
+         | TYPECASE expr error      { $$ = new ast::Typecase($2, nullptr, @$.first_line); }
+         | TYPECASE expr '{' error  { $$ = new ast::Typecase($2, nullptr, @$.first_line); }
+         ;
+
+type_alternatives: type_alternatives ident ':' ident statement_block { 
+                                      $$ = $1;
+                                      $$->append(new ast::Type_Alternative($2, $4, $5, @$.first_line)); }
+                 | /* empty */      { $$ = new ast::Type_Alternatives(@$.first_line); }
+                 | type_alternatives ident error { 
+                                      delete $2; $$ = nullptr; }
+                 | type_alternatives ident ':' error { 
+                                      delete $2; $$ = nullptr; }
+                 ;
+
+/* *************************************
+ * Statements: Assignment
+ * *************************************
+ */ 
+statement: l_expr '=' expr ';'      { $$ = new ast::Assign($1, $3, @$.first_line); }
+         | l_expr ':' ident '=' expr ';' 
+                                    { $$ = new ast::AssignDeclare($1, $5, $3, @$.first_line); }
+         /* Error handling */
+         | l_expr '=' expr error 
+                                    { $$ = new ast::Assign($1, $3, @$.first_line); }
+         | l_expr ':' ident '=' expr error 
+                                    { $$ = new ast::AssignDeclare($1, $5, $3, @$.first_line); }
+         | l_expr ':' error         { $$ = new ast::AssignDeclare($1, nullptr, nullptr, @$.first_line); }
+         ;
+
+/* l_expr: Things we can assign to, or call.
+ * (Evaluate to a location; type checking determines
+ * what type is compatible.)
+ * Including: 
+ *    Simple local variable assignments like x = expr; 
+ *    Fields of the current object, this.x = expr; 
+ *    Methods of any object, (3+4).PRINT, sqr.translate(1,1).translate
+ */ 
+l_expr: ident                       { $$ = $1; }
+      ;
+
+/* When we reference a field in an object, we 
+ * obtain the value of the object and then get 
+ * the location of the field within it.  That 
+ * goes even for 'this'. 
+ * (Maybe we should allow 'friendly' access
+ * also for other type-compatible objects?) 
+ */ 
+l_expr: expr '.' ident              { $$ = new ast::Dot($1, $3, @$.first_line); }
+      | expr '.' error              { $$ = new ast::Dot($1, nullptr, @$.first_line); }
+      ;
+
+/* *************************************
+ * Expressions 
+ * (right-hand expressions, i.e., expressions
+ *  that evaluate to values rather than locations)
+ * *************************************
+ */
+
+/* An l_expr is also an expr; we load the value 
+ * from that address.  Even though this is a unit production,
+ * it corresponds to an operation (loading a value) in the
+ * semantics, so we give it a node in the ast.
+ */ 
+expr: l_expr                        { $$ = new ast::Load($1, @$.first_line); }
+    | error                         { $$ = nullptr; }
+    ;
+
+/* Values can also be denoted by literals */
+expr: STRING_LIT                    { $$ = new ast::StrConst($1, @$.first_line); free($1); }
+    | INT_LIT                       { $$ = new ast::IntConst($1, @$.first_line); }
+    ;
+
+/* The binary operations.  We will use precedence 
+ * rather than expanding out the expression grammar. 
+ * We order by precedence and indicate associativity. 
+ * 
+ * Binary and unary operations are implemented by 
+ * desugaring:  Abstract syntax is method calls. 
+ */
+expr: expr '*' expr                 { $$ = ast::Call::binop("TIMES", $1, $3, @$.first_line); }
+    | expr '/' expr                 { $$ = ast::Call::binop("DIV", $1, $3, @$.first_line); }
+    | expr '+' expr                 { $$ = ast::Call::binop("PLUS", $1, $3, @$.first_line); }
+    | expr '-' expr                 { $$ = ast::Call::binop("MINUS", $1, $3, @$.first_line); }
+    | '-' expr  %prec NEG           { auto zero = new ast::IntConst(0, @$.first_line);
+                                      $$ = ast::Call::binop("MINUS", zero, $2, @$.first_line); }
+    /* Comparisons */       
+    | expr EQUALS expr              { $$ = ast::Call::binop("EQUALS", $1, $3, @$.first_line); }
+    | expr ATLEAST expr             { $$ = ast::Call::binop("ATLEAST", $1, $3, @$.first_line); }
+    | expr '>' expr                 { $$ = ast::Call::binop("MORE", $1, $3, @$.first_line); }
+    | expr ATMOST expr              { $$ = ast::Call::binop("ATMOST", $1, $3, @$.first_line); }
+    | expr '<' expr                 { $$ = ast::Call::binop("MORE", $1, $3, @$.first_line); }
+    /* Boolean expressions are NOT syntactic sugar */
+    | expr AND expr                 { $$ = new ast::And($1, $3, @$.first_line); }
+    | expr OR expr                  { $$ = new ast::Or($1, $3, @$.first_line); }
+    | NOT expr                      { $$ = new ast::Not($2, @$.first_line); }
+    | '(' expr ')'                  { $$ = $2; }
+    ;
+
+/* Method calls are indicated in the usual way 
+ * as obj.method(args)
+ * 
+ * Precedence note:  
+ *   a+b.c(i) is a+(b.c(i))
+ *   a.b.c(i) is (a.b).c(i)
+ * We make calls on an expr, not an lexpr --- 
+ *   we need an actual value to look up the 
+ *   method in.  The only exception is class 
+ *   constructors ... but we can treat the
+ *   class as an rvalue also. 
+ */
+expr: expr '.' ident '(' actual_args ')' { 
+                                      $$ = new ast::Call($1, $3, $5, @$.first_line); }
+    /* constructor */
+    | ident '(' actual_args ')'     { $$ = new ast::Construct($1, $3, @$.first_line); }
+    ;
+
+actual_args: actual_args_nonempty   { $$ = $1; }
+           | /* empty */            { $$ = new ast::Actuals(@$.first_line); }
+           ;
+
+actual_args_nonempty: actual_args_nonempty ',' expr { 
+                                      $$ = $1; $$->append($3); }
+                    | expr          { $$ = new ast::Actuals(@$.first_line); $$->append($1); }
+                    /* Error handling */
+                    | actual_args_nonempty error { 
+                                      $$ = $1; }
+                    ;
+
+ident: IDENT                        { $$ = new ast::Ident($1, @$.first_line); free($1); }
+     /* Error handling */
+
+%%

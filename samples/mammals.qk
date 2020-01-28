@@ -1,0 +1,30 @@
+/* Type inference example. */
+
+class Mammal(species: String) {
+    this.species = species;
+    def _species(): String { return this.species; }
+    def is_furry(): Boolean { return True; }
+}
+
+class Feline(species: String) extends Mammal {
+    this.species = species;
+    def is_obligate_carnivore(): Boolean { return True; }
+}
+
+class Weasel() extends Mammal {
+    this.species = "mustela putorius furo";
+    def is_obligate_carnivore(): Boolean { return True; }
+}
+
+willy = Weasel();
+my_pet = willy;
+if my_pet.is_obligate_carnivore() {
+    "Can a ferret eat cat food?".PRINT();
+}
+nora = Feline("felis catus");
+
+if 42 == 42 {
+   my_pet = nora;
+}
+
+("My pet is a " + my_pet._species()).PRINT();

@@ -1,0 +1,18 @@
+/*
+ * This tiny program uses only Quack constructs accepted by the starter
+ * code for the parser.  It's a legal Quack program, but not a very interesting
+ * one.
+ */
+
+if  true {
+     x = 42;
+} else {
+     x = 19;  // This should never happen
+}
+/* Starter parser has no bare expressions, so
+ * I'll put the 'print' call in an assignment.
+ */
+nothing  = x.PRINT();
+// nothing should have type 'Nothing' here,
+// similar to the Python 'none' type, C/C++ 'void'
+
