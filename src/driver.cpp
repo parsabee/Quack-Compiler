@@ -89,19 +89,23 @@ namespace ast {
 
     void
     Driver::compile() {
-        if (yyparse() == 0) {
+        yyparse();
+        if (report::num_errors == 0) {
+
             auto *pgm = dynamic_cast<Program *>(root);
-            assert(pgm);
+            assert(pgm != nullptr);
             Stack st(pgm->_classes);
+
             TypeChecker tc(pgm, st);
             tc.type_check();
+
             if (report::num_errors == 0) {
                 CodeGenerator cg(pgm, _out, st);
                 cg.code_gen();
             } else
                 report::summary();
         } else
-            throw NotParsed();
+            report::summary();
     }
 
 }
