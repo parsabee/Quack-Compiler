@@ -31,11 +31,7 @@ class Vec2D (x: Int, y: Int) {
     }
 
     def PRINT () {
-        "<".PRINT();
-        this.x.PRINT();
-        ", ".PRINT();
-        this.y.PRINT();
-        ">\n".PRINT();
+        ("<" + this.x.STR() + ", " + this.y.STR() + ">\n").PRINT();
     }
 }
 

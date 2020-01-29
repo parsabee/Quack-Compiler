@@ -93,28 +93,34 @@ obj_Vec2D Vec2D_method_PLUS( obj_Vec2D this, obj_Vec2D var__other ) {
 }
 
 obj_Nothing Vec2D_method_PRINT( obj_Vec2D this ) {
-  obj_String tmp__0003 = str_literal( "<" );
-  obj_String tmp__0002 = tmp__0003;
+  obj_String tmp__0011 = str_literal( "<" );
+  obj_String tmp__0010 = tmp__0011;
+  obj_Vec2D tmp__0014 = (obj_Vec2D)this;
+  obj_Int tmp__0015 = (obj_Int)(tmp__0014->x);
+  obj_Int tmp__0013 = tmp__0015;
+  obj_String tmp__0012 = (obj_String)tmp__0013->clazz->STR((obj_Int)tmp__0013);
+  obj_String tmp__0016 = tmp__0012;
+  obj_String tmp__0009 = (obj_String)tmp__0010->clazz->PLUS((obj_String)tmp__0010, (obj_String)tmp__0016);
+  obj_String tmp__0017 = tmp__0009;
+  obj_String tmp__0008 = tmp__0017;
+  obj_String tmp__0018 = str_literal( ", " );
+  obj_String tmp__0007 = (obj_String)tmp__0008->clazz->PLUS((obj_String)tmp__0008, (obj_String)tmp__0018);
+  obj_String tmp__0019 = tmp__0007;
+  obj_String tmp__0006 = tmp__0019;
+  obj_Vec2D tmp__0022 = (obj_Vec2D)this;
+  obj_Int tmp__0023 = (obj_Int)(tmp__0022->y);
+  obj_Int tmp__0021 = tmp__0023;
+  obj_String tmp__0020 = (obj_String)tmp__0021->clazz->STR((obj_Int)tmp__0021);
+  obj_String tmp__0024 = tmp__0020;
+  obj_String tmp__0005 = (obj_String)tmp__0006->clazz->PLUS((obj_String)tmp__0006, (obj_String)tmp__0024);
+  obj_String tmp__0025 = tmp__0005;
+  obj_String tmp__0004 = tmp__0025;
+  obj_String tmp__0026 = str_literal( ">\n" );
+  obj_String tmp__0003 = (obj_String)tmp__0004->clazz->PLUS((obj_String)tmp__0004, (obj_String)tmp__0026);
+  obj_String tmp__0027 = tmp__0003;
+  obj_String tmp__0002 = tmp__0027;
   obj_Obj tmp__0001 = (obj_Obj)tmp__0002->clazz->PRINT((obj_Obj)tmp__0002);
-  obj_Obj tmp__0004 = tmp__0001;
-  obj_Vec2D tmp__0007 = (obj_Vec2D)this;
-  obj_Int tmp__0008 = (obj_Int)(tmp__0007->x);
-  obj_Int tmp__0006 = tmp__0008;
-  obj_Obj tmp__0005 = (obj_Obj)tmp__0006->clazz->PRINT((obj_Obj)tmp__0006);
-  obj_Obj tmp__0009 = tmp__0005;
-  obj_String tmp__0012 = str_literal( ", " );
-  obj_String tmp__0011 = tmp__0012;
-  obj_Obj tmp__0010 = (obj_Obj)tmp__0011->clazz->PRINT((obj_Obj)tmp__0011);
-  obj_Obj tmp__0013 = tmp__0010;
-  obj_Vec2D tmp__0016 = (obj_Vec2D)this;
-  obj_Int tmp__0017 = (obj_Int)(tmp__0016->y);
-  obj_Int tmp__0015 = tmp__0017;
-  obj_Obj tmp__0014 = (obj_Obj)tmp__0015->clazz->PRINT((obj_Obj)tmp__0015);
-  obj_Obj tmp__0018 = tmp__0014;
-  obj_String tmp__0021 = str_literal( ">\n" );
-  obj_String tmp__0020 = tmp__0021;
-  obj_Obj tmp__0019 = (obj_Obj)tmp__0020->clazz->PRINT((obj_Obj)tmp__0020);
-  obj_Obj tmp__0022 = tmp__0019;
+  obj_Obj tmp__0028 = tmp__0001;
   return none;
 }
 
