@@ -1,0 +1,3 @@
+/Users/parsabagheri/dev/Quack-Compiler/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/parsabagheri/dev/Quack-Compiler/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/parsabagheri/dev/Quack-Compiler/cmake-build-debug/CMakeFiles/qkc.dir
