@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Qucak_Compiler)
+project(Quack_Compiler)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -13,7 +13,7 @@ ADD_FLEX_BISON_DEPENDENCY(MyScanner MyParser)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(./src/)
 
-file(GLOB qkc_SRC "src/*.hpp" "src/*.cpp")
+file(GLOB qkc_SRC "./src/*.hpp" "./src/*.cpp")
 
 add_executable(
         qkc

@@ -89,7 +89,7 @@ namespace ast {
 
     void
     Driver::compile() {
-        yyparse();
+        int result = yyparse();
         if (report::num_errors == 0) {
 
             auto *pgm = dynamic_cast<Program *>(root);
@@ -102,10 +102,15 @@ namespace ast {
             if (report::num_errors == 0) {
                 CodeGenerator cg(pgm, _out, st);
                 cg.code_gen();
-            } else
+            } else {
                 report::summary();
-        } else
-            report::summary();
+            }
+        } else {
+            report::summary(); 
+        }
+        if (result == 0) { /* result is 0 if AST was generated */
+            delete root;  /* done with the AST delete it */
+        }
     }
 
 }
