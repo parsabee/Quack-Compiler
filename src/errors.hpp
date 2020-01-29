@@ -6,11 +6,14 @@
 
 namespace io {
     struct BadInputFile : public std::exception {
-        BadInputFile() = default;
+        explicit BadInputFile(const std::string& note)
+            : error("BadInputFile -- " + note){}
 
         const char *what() const noexcept override {
-            return "BadInputFile";
+            return error.c_str();
         }
+        private:
+            std::string error;
     };
 }
 namespace ast {

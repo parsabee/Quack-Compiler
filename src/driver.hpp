@@ -43,11 +43,11 @@ namespace ast {
             void code_gen();
         };
 
-        char *_filename;
+        const char *_filename;
         FILE *_file;
         std::ostream &_out;
     public:
-        Driver(std::ostream &out, char *file);
+        Driver(std::ostream &out,const char *file);
         void compile();
         ~Driver() {
             if (_file) fclose(_file);

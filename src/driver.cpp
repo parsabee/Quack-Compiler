@@ -82,11 +82,14 @@ namespace ast {
         delete _st.pop();
     }
 
-    Driver::Driver(std::ostream &out, char *file) : _filename(file), _out(out) {
+    Driver::Driver(std::ostream &out,const char *file) : _filename(file), _out(out) {
+        int len = strlen(file);
+        if (strcmp(".qk", file + len - 3) != 0) /* making sure extension is .qk */
+            throw io::BadInputFile("the input file extension is not `.qk'");
         if ((_file = fopen(_filename, "r")) != nullptr)
             yyin = _file;
         else
-            throw io::BadInputFile();
+            throw io::BadInputFile("no such file");
     }
 
     void
