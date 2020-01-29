@@ -26,8 +26,6 @@ namespace ast {
     void
     Driver::CodeGenerator::code_gen() {
         CodegenContext _ctx(_out);
-        std::string global_str = "___global___";
-        auto *global = new SymbolTable(global_str);
         _ctx.emit("/*\n"
                   " * MIT License\n"
                   " *\n"
@@ -53,6 +51,10 @@ namespace ast {
                   " */\n\n");
         _ctx.emit("#include <stdlib.h>\n");
         _ctx.emit("#include \"builtins.h\"\n\n"); /* preamble */
+
+        std::string global_str = "___global___";
+        auto *global = new SymbolTable(global_str);
+
         if (_pgm->_classes->len() > 5) /* 5 builtin classes */
             _ctx.emit("/* ======================= Class Declerations ======================= */\n\n");
 
@@ -90,7 +92,7 @@ namespace ast {
     void
     Driver::compile() {
         int result = yyparse();
-        if (report::num_errors == 0) {
+        if (report::num_errors == 0 && result == 0) {
 
             auto *pgm = dynamic_cast<Program *>(root);
             assert(pgm != nullptr);
