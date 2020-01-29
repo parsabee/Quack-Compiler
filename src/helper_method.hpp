@@ -19,6 +19,10 @@ namespace ast {
  * helper class for type checking methods and method calls
  */
     class MethodChecker {
+
+        /*
+         * TODO : check if MAGIC METHODS are being used properly, i.e. right number of arguments return type etc.
+         * */
         Method *_method;
         Stack &_st;
         std::string _name;

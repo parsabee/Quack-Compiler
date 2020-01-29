@@ -180,7 +180,7 @@ namespace ast {
 
         /* generating class/object struct === */
 
-        _ctx.emitObjStruct(_class->_name->get_text(), _class->_attributes);
+        _ctx.emit_obj_struct(_class->_name->get_text(), _class->_attributes);
         _ctx.emit("struct class_" + _class->get_name() + "_struct {\n");
         _ctx.indent();
         _ctx.emit("class_" + _class->get_super() + " _super;\n\n");

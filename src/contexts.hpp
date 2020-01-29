@@ -8,6 +8,8 @@
 #include "symtable.hpp"
 
 namespace ast {
+    class Stack; /* forward reference */
+
     class PrintContext {
     public:
         int _indent;
@@ -33,24 +35,27 @@ namespace ast {
 
         void emit(const std::string& str);
 
-        void emitClassSig(const std::string& cls);
+        void emit_class_sig(const std::string& cls);
 
-        void emitObjStruct(const std::string& cls,
-                           std::unordered_map<std::string, std::string> *attrs);
+        void emit_obj_struct(const std::string& cls,
+                             std::unordered_map<std::string, std::string> *attrs);
+
+        /* if variable is not already declared, generate the declaration */
+        void declare_variable(const std::string& type, const std::string& var, Stack& st);
 
         static std::string gen_stars(const std::string& str);
 
-        std::string gen_IfLabel();
+        std::string gen_if();
 
-        std::string gen_BreakLabel();
+        std::string gen_break();
 
-        std::string gen_LoopLabel();
+        std::string gen_loop();
 
-        std::string gen_TrueLabel();
+        std::string gen_true();
 
-        std::string gen_FalseLabel();
+        std::string gen_false();
 
-        std::string gen_EndLabel();
+        std::string gen_end();
 
         std::string gen_temp();
 

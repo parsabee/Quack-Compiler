@@ -116,7 +116,7 @@ namespace ast {
             for (Class *cls: the_classes) {
                 if (!cls->is_builtin()) {
                     std::string class_name = cls->get_name();
-                    ctx.emitClassSig(class_name); /* outputting forward references to our classes */
+                    ctx.emit_class_sig(class_name); /* outputting forward references to our classes */
                     global->add_symbol(class_name, class_name, TYPE);
                 }
             }
@@ -199,6 +199,7 @@ namespace ast {
 
     void
     Method::code_gen(CodegenContext &ctx, Stack &st) {
+
         std::string str = st.top()->get_name();
         auto *symtable = new SymbolTable(str + ":" + _name->get_text());
         st.push(symtable);
@@ -212,6 +213,7 @@ namespace ast {
             std::string var = ast::CodegenContext::gen_variable(it->get_var()->get_text());
             ss << var;
             st.top()->gen_symbol(it->get_var()->get_text());
+            st.top()->add_symbol(it->get_var()->get_text(), it->get_type()->get_text(), LET);
         }
         ss << " )";
         ctx.emit("obj_" + return_type + " " + method_name + ss.str() + " {\n");
@@ -362,9 +364,9 @@ namespace ast {
          * ===================================================== */
 
         std::string true_label, false_label, end_label;
-        true_label = ctx.gen_TrueLabel();
-        false_label = ctx.gen_FalseLabel();
-        end_label = ctx.gen_EndLabel();
+        true_label = ctx.gen_true();
+        false_label = ctx.gen_false();
+        end_label = ctx.gen_end();
         _true_part->type_check(st);
         _false_part->type_check(st);
         forward_ref(ctx, st, _true_part, "true");
@@ -423,9 +425,9 @@ namespace ast {
          * ===================================================== */
 
         std::string if_label, loop_label, break_label;
-        if_label = ctx.gen_IfLabel();
-        loop_label = ctx.gen_LoopLabel();
-        break_label = ctx.gen_BreakLabel();
+        if_label = ctx.gen_if();
+        loop_label = ctx.gen_loop();
+        break_label = ctx.gen_break();
         forward_ref(ctx, st, _body, "loop");
         ctx.emit("goto " + if_label + ";\n");
         ctx.emit("\n" + loop_label + ": /* while loop */ ;\n");
@@ -543,11 +545,8 @@ namespace ast {
         else {
             try {
                 std::string type = st.get_symbol(_text).first;
+                ctx.declare_variable(type, _text, st);
                 std::string var = ast::CodegenContext::gen_variable(_text);
-                if (!st.top()->is_generated(_text)) {
-                    ctx.emit("obj_" + type + " " + var + ";\n");
-                    st.top()->gen_symbol(_text);
-                }
                 ctx.emit("obj_" + type + " " + tmp + " = " + var + ";\n");
             }
             catch (const SymbolNotFound &ex) { /* it's ok, already typechecked */ }

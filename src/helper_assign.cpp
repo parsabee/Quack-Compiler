@@ -140,17 +140,8 @@ namespace ast {
     void AssignGenerator::gen_ident() {
         auto left = dynamic_cast<Ident *>(_assign->get_left());
         assert (left != nullptr);
-        if (_st.top()->is_generated(left->get_text())) {
-            return; /* already generated */
-        }
         try {
-            std::string left_type = left->infer(_st);
-            std::string name = left->get_text();
-            std::string str;
-            str += "obj_" + left_type + " " + ast::CodegenContext::gen_variable(left->get_text()) + ";\n";
-            _st.top()->gen_symbol(name);
-            _ctx.emit(str);
-
+            _ctx.declare_variable(left->infer(_st), left->get_text(), _st);
         } catch (SymbolNotFound &ex) {
             assert(false); /* after type checking, we can't have symbol not found*/
         }
