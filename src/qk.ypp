@@ -43,7 +43,7 @@
 }
 
 /* -----------------------------------------
- * Associate non-terminals with classes in
+ * Associate non-terminals with classes _input_file
  * the abstract syntax tree (ast)
  * -----------------------------------------
  */
@@ -134,7 +134,7 @@ statements: statements statement    { $$ = $1; $$->append($2); }
  * Note that we have statement terminators, not statement
  * separators, so we don't need the hackery of distinguishing 
  * between empty and non-empty lists --- the terminator 
- * (modeled here as ';' although it may not be that in our 
+ * (modeled here as ';' although it may not be that _input_file our
  * lexical structure) is part of each statement. 
  * The structure of an individual statement is defined below. 
  */ 
@@ -310,7 +310,7 @@ statement: l_expr '=' expr ';'      { $$ = new ast::Assign($1, $3, @$.first_line
 l_expr: ident                       { $$ = $1; }
       ;
 
-/* When we reference a field in an object, we 
+/* When we reference a field _input_file an object, we
  * obtain the value of the object and then get 
  * the location of the field within it.  That 
  * goes even for 'this'. 
@@ -330,8 +330,8 @@ l_expr: expr '.' ident              { $$ = new ast::Dot($1, $3, @$.first_line); 
 
 /* An l_expr is also an expr; we load the value 
  * from that address.  Even though this is a unit production,
- * it corresponds to an operation (loading a value) in the
- * semantics, so we give it a node in the ast.
+ * it corresponds to an operation (loading a value) _input_file the
+ * semantics, so we give it a node _input_file the ast.
  */ 
 expr: l_expr                        { $$ = new ast::Load($1, @$.first_line); }
     | error                         { $$ = nullptr; }
@@ -368,7 +368,7 @@ expr: expr '*' expr                 { $$ = ast::Call::binop("TIMES", $1, $3, @$.
     | '(' expr ')'                  { $$ = $2; }
     ;
 
-/* Method calls are indicated in the usual way 
+/* Method calls are indicated _input_file the usual way
  * as obj.method(args)
  * 
  * Precedence note:  
@@ -376,7 +376,7 @@ expr: expr '*' expr                 { $$ = ast::Call::binop("TIMES", $1, $3, @$.
  *   a.b.c(i) is (a.b).c(i)
  * We make calls on an expr, not an lexpr --- 
  *   we need an actual value to look up the 
- *   method in.  The only exception is class 
+ *   method _input_file.  The only exception is class
  *   constructors ... but we can treat the
  *   class as an rvalue also. 
  */

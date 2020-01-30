@@ -29,7 +29,7 @@ namespace ast {
          * constructor
          *
          * takes environment stack (Stack&)
-         *       pointer to block of statements in a class constructor (Block*)
+         *       pointer to block of statements _input_file a class constructor (Block*)
          *       attribute name-type map (unordered_map<string, string>&)
          */
         explicit AttributeParser(Stack &st, Block *statements,
@@ -61,7 +61,7 @@ namespace ast {
         /*
          * private method,
          * takes the intersection of maps m1 and m2,
-         * inserts them in map `map'
+         * inserts them _input_file map `map'
          */
         void
         map_intersection(std::unordered_map<std::string, std::string> &m1,

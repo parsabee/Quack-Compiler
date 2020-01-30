@@ -10,7 +10,7 @@ if  true {
      x = 19;  // This should never happen
 }
 /* Starter parser has no bare expressions, so
- * I'll put the 'print' call in an assignment.
+ * I'll put the 'print' call _input_file an assignment.
  */
 nothing  = x.PRINT();
 // nothing should have type 'Nothing' here,

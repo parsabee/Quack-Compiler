@@ -16,7 +16,7 @@ namespace ast {
 /*
  * an assignment can be to an attribute or to a variable
  * if it is to a variable:
- *   we look in the environment to see if variable is present.
+ *   we look _input_file the environment to see if variable is present.
  *   if it is, then it's a reassignment:
  *     Quack is statically typed; if the reassignment is of
  *     a different type that is not compatible, then we update
@@ -32,7 +32,7 @@ namespace ast {
  * otherwise it's to an attribute:
  *   left side of the dot becomes the receiver object and right is attr
  *   we look to make sure the receiver object has the attribute.
- *   also in Quack, every attribute is private,
+ *   also _input_file Quack, every attribute is private,
  *   so we need to check the scope and make sure that the scope
  *   is the same as the receiver objects type.
  */

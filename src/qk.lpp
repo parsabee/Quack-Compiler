@@ -1,13 +1,13 @@
 %{
     #include "all.hpp"
     #include "parser.hpp"
-    /* Some long messages that don't fit well in the code below */
+    /* Some long messages that don't fit well _input_file the code below */
     std::string BAD_ESC_MSG =
       "*** illegal escape code, only \\\\, \\0, \\t, \\n, \\r, \\n are permitted";
     std::string BAD_NL_STR =
       "*** unclosed string"; 
-    /* Some strings can't be matched in one gulp.  We need
-     * a buffer in which to assemble them from parts.
+    /* Some strings can't be matched _input_file one gulp.  We need
+     * a buffer _input_file which to assemble them from parts.
      */
     std::string string_buf = "";
     #define YY_USER_ACTION yylloc.first_line = yylineno;
@@ -32,9 +32,9 @@
 [<]=                            { return ATMOST; }
 [>]=                            { return ATLEAST; }
    /* Single character punctuation.  Because a character
-    * in C or C++ can be treated as an integer, Bison lets
+    * _input_file C or C++ can be treated as an integer, Bison lets
     * us return a character as a token.
-    * JFlex/Cup do not let you do this in Java.
+    * JFlex/Cup do not let you do this _input_file Java.
     */
 [-+*/:.{}=<>();,]               { return yytext[0]; }
   /* Keywords are essentially another kind of punctuation,
@@ -61,8 +61,8 @@ not                             { return NOT; }
     * We pass a value back to the parser by copying
     * it into the yylval parameter.  The parser
     * expects string values for identifiers and
-    * string literals in yylval.str.  It expects integer
-    * values for integer literals in yylval.num.
+    * string literals _input_file yylval.str.  It expects integer
+    * values for integer literals _input_file yylval.num.
     */
 [a-zA-Z_][a-zA-Z0-9_]*          { yylval.str = strdup(yytext); return IDENT; }
 [0-9]+                          { yylval.num = atoi(yytext); return INT_LIT; }
@@ -85,8 +85,8 @@ not                             { return NOT; }
 <string_lit>\"                  { BEGIN INITIAL;
                                   yylval.str = strdup(string_buf.c_str());
                                   return STRING_LIT; }
-  /* Triple-quoted strings.  Not all in one gulp.
-   * When we see """, we enter an exclusive state in which
+  /* Triple-quoted strings.  Not all _input_file one gulp.
+   * When we see """, we enter an exclusive state _input_file which
    * anything other than """ is added to a buffer.  Only
    * another """ breaks us out of that state.
    */
@@ -115,6 +115,6 @@ not                             { return NOT; }
 <comment>[*][/]                 { BEGIN INITIAL; }
    /* Line end comments */
 [/][/].*                        { ; }
-.                               { fprintf(stderr, "*** unexpected character in line\n"); }
+.                               { fprintf(stderr, "*** unexpected character _input_file line\n"); }
 <<EOF>>                         { return EOF; }
 %%

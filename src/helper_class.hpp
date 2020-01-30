@@ -65,7 +65,7 @@ namespace ast {
     };
 
 /*
- * helper class for generating code for classes in quack
+ * helper class for generating code for classes _input_file quack
  */
     class ClassGenerator {
         /*

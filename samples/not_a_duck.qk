@@ -8,9 +8,9 @@
  *
  * In Quack, it is not enough that both Int and String
  * have a LESS method. The LESS methods must also be "the 
- * same" in the sense of being either inherited or overridden 
+ * same" _input_file the sense of being either inherited or overridden
  * from the same base class, which is the case iff their least
- * common ancestor in the class hierarchy has a LESS method.
+ * common ancestor _input_file the class hierarchy has a LESS method.
  * In this example, although String and Int both have LESS
  * methods, they may be completely unrelated, because the nearest
  * common ancestor of Int and String is Obj, and Obj does not have a

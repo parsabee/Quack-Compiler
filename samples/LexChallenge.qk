@@ -10,5 +10,5 @@ class Challenge() {
 
    /* comment before */ z = """
 You can put all kinds of 
-crazy \z\a\.\""" + "stuff in a triple-quoted string"; 
+crazy \z\a\.\""" + "stuff _input_file a triple-quoted string";
 }

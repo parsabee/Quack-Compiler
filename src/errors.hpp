@@ -5,9 +5,9 @@
 #include "msg.hpp"
 
 namespace io {
-    struct BadInputFile : public std::exception {
-        explicit BadInputFile(const std::string& note)
-            : error("BadInputFile -- " + note){}
+    struct BadFile : public std::exception {
+        explicit BadFile(const std::string& note)
+            : error("BadFile -- " + note){}
 
         const char *what() const noexcept override {
             return error.c_str();
@@ -24,7 +24,7 @@ namespace ast {
         ast_exception() = default;
 
         const char *what() const noexcept override {
-            return "ast_exception";
+            return "ASTException";
         }
     };
 

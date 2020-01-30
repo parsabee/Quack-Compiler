@@ -50,7 +50,7 @@ namespace ast {
         for (auto & it : *parent->get_attrs()) {
             if (!_class->has_attr(it.first)) {
                 std::cerr << "inherited attribute '" << it.first
-                          << "' is not initialized in class "
+                          << "' is not initialized _input_file class "
                           << _class->get_name() << "\n";
                 throw AttributeError(it.first);
             } else if (_class->get_attrs()->at(it.first) != it.second) {
@@ -58,7 +58,7 @@ namespace ast {
                 if (!tmp->has_ancestor(it.second, _st)) {
                     std::cerr << "inherited attribute '" << it.first << "'s type "
                               << tmp->get_name() << " doesn't match it's parent type "
-                              << it.second << " in class " << _class->get_name() << "\n";
+                              << it.second << " _input_file class " << _class->get_name() << "\n";
                     throw AttributeError(it.first);
                 }
             }
@@ -68,7 +68,7 @@ namespace ast {
 /* 
  * overloading is not allowed
  * checking for overloading
- * throw exception in case of error
+ * throw exception _input_file case of error
  */
     void
     ClassChecker::check_methods() {
@@ -197,7 +197,7 @@ namespace ast {
         if (first) str += "void";
         str += ");\n";
         _ctx.emit(str);
-        std::vector<DispatchMethod> vec; /* methods, in order of appearance */
+        std::vector<DispatchMethod> vec; /* methods, _input_file order of appearance */
         gen_helper(_class, vec);
 
         /* ================================================================
@@ -205,7 +205,7 @@ namespace ast {
          *
          * Because quack is object oriented, we use dynamic dispatch.
          * methods need to be topologically sorted
-         * with 'Obj's (every class inherits it) methods appearing first in the table
+         * with 'Obj's (every class inherits it) methods appearing first _input_file the table
          * following datastructures is for ensuring our dynamic dispatch calls
          * the correct function
          * ================================================================ */
@@ -295,7 +295,7 @@ namespace ast {
 
 /*  
  * helper method to recursively topologically sort methods of a class
- * storing them in argument 'vec'
+ * storing them _input_file argument 'vec'
  */
     void
     ClassGenerator::gen_helper(Class *cur, std::vector<DispatchMethod> &vec) {

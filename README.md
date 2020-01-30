@@ -1,6 +1,6 @@
 # Quack-Compiler
 a compiler for Quack, an object oriented statically typed language with type inference.
-Work in progress...
+Work _input_file progress...
 
 ### Build
 ```

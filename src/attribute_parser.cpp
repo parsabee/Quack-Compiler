@@ -1,7 +1,7 @@
 /*
  * attribute_parser.cpp
  *
- * defines class in attribute_parser.hpp.
+ * defines class _input_file attribute_parser.hpp.
  *
  * author: Parsa Bagheri
  */

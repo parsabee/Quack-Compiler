@@ -1,6 +1,6 @@
 /**
  * How should one perform type inference 
- * for variable x in this program? 
+ * for variable x _input_file this program?
  *
  * Iterate to a fixed point (abstract interpretation)? 
  * Somehow short-circuit the walk up the type system? 
@@ -53,7 +53,7 @@ while ( x == x ) {
    - Another approach is to treat it as an abstract interpretation 
        problem, using the control structure with types as abstract 
        values and the type hierarchy as the lattice of abstract 
-       values.  Then the number of iterations required could in the 
+       values.  Then the number of iterations required could _input_file the
        worst case be the height of the class hierarchy, using the 
        usual abstract interpretation rule for deriving a 
        least common ancestor from a collecting semantics. 

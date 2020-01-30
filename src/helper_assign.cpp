@@ -104,7 +104,7 @@ namespace ast {
 
     void AssignChecker::check_scope() {
 
-        /* an assignment in the global scope can't have Dot left expression */
+        /* an assignment _input_file the global scope can't have Dot left expression */
         if (_assign->_lexpr->type() == DOT) {
             std::string str = _st.top()->get_name();
             std::string environment = str.substr(0, str.find(':'));

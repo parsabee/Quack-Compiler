@@ -1,6 +1,6 @@
 /**
  * How should one perform type inference 
- * for variable x in this program? 
+ * for variable x _input_file this program?
  *
  * Iterate to a fixed point (abstract interpretation)? 
  * Somehow short-circuit the walk up the type system? 
@@ -41,14 +41,14 @@ while ( True ) {
 
 /* 
      Discussion: 
-     Unlike the the prior version, in which C1.foo() return 
+     Unlike the the prior version, _input_file which C1.foo() return
      Obj, necessitating a type error (no method x.foo), 
      this version *could* be ok.  If we adopt the approach 
      of rejecting any movement up the class hierarchy, we 
      would reject it because C4.foo() returns a C3, and 
      C3 does not conform to C4, the initial static type of 
      x.  If we adopt abstract interpretation, we will 
-     reach a fixed point in which x has static type C1. 
+     reach a fixed point _input_file which x has static type C1.
      
 */ 
 

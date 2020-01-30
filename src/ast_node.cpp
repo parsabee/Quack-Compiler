@@ -24,7 +24,7 @@ namespace ast {
 
 /*
  * static function, code-gen helper
- * declares variables before assignment (in target code)
+ * declares variables before assignment (_input_file target code)
  */
     static void
     forward_ref(CodegenContext &ctx, Stack &st, Block *statements, const std::string& opt = "") {
@@ -339,7 +339,7 @@ namespace ast {
         _false_part->type_check(st);
         (void) st.pop();
 
-        /* collecting symbols defined in both true and false branches */
+        /* collecting symbols defined _input_file both true and false branches */
         SymbolTable *ture_false_intersection = st.intersection(true_table, false_table);
         /* merging intersection with the top-most symbol table */
         st.merge(ture_false_intersection);
@@ -887,7 +887,7 @@ namespace ast {
             std::string str = st.top()->get_name();
             std::string environment = str.substr(0, str.find(':'));
             if (environment == "___global___") {
-                std::cerr << "accessing private data in global scope\n";
+                std::cerr << "accessing private data _input_file global scope\n";
                 throw TypeError();
             } else
                 left_type = environment;

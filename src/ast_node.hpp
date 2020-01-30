@@ -28,7 +28,7 @@
 }
 
 /*
- * number in a sequence
+ * number _input_file a sequence
  */
 #define NUMBER(OUT, NUM) {      \
   switch(NUM)                   \
@@ -102,7 +102,7 @@ namespace ast {
         TYPECASE
     };
 
-/* abstract node in the AST */
+/* abstract node _input_file the AST */
     class ASTNode {
     protected:
         void json_indent(std::ostream &out, PrintContext &ctx);
@@ -336,7 +336,7 @@ namespace ast {
         Ident *_returns;
         Block *_statements;
         std::string _owner;
-        bool _overriden; /* is method an override?, will be set in typechecking stage */
+        bool _overriden; /* is method an override?, will be set _input_file typechecking stage */
         bool _has_return; /* let the code generator know if there is't a return, take appropriate action */
         int _line_no;
     public:

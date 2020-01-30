@@ -10,6 +10,7 @@
 #include "ast_node.hpp"
 #include "stack.hpp"
 #include "msg.hpp"
+#include <fstream>
 
 /* from bison */
 extern ast::ASTNode *root;
@@ -43,12 +44,14 @@ namespace ast {
             void code_gen();
         };
 
-        const char *_filename;
+        const char *_input_file, *_output_file;
         FILE *_file;
-        std::ostream &_out;
+        std::ofstream _out;
     public:
-        Driver(std::ostream &out,const char *file);
+        explicit Driver(const char *input_file, const char *output_file = nullptr);
         void compile();
+        void json();
+        static bool assert_file_type(const char *file, const char *ext);
         ~Driver() {
             if (_file) fclose(_file);
         }

@@ -40,7 +40,7 @@ namespace ast {
 
         /* static method, type checking a method call
          *
-         * takes pointer to actuals in the call,
+         * takes pointer to actuals _input_file the call,
          * pointer to the called method,
          * and reference to the environment stack
          */
