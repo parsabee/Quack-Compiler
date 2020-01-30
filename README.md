@@ -1,6 +1,6 @@
 # Quack-Compiler
 a compiler for Quack, an object oriented statically typed language with type inference.
-Work _input_file progress...
+Work in progress...
 
 ### Build
 ```
@@ -9,7 +9,7 @@ cd build
 cmake ..
 cmake --build .
 ```
-### execute
+### Execute
 ```
-./qkc <.qk file>
+./qkc [-o output] <.qk input file> 
 ```
