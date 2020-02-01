@@ -10,7 +10,7 @@ namespace ast {
 
     bool
     is_reserved(const std::string& str) {
-        std::string reserved[] = {"this", "___global___", "___builtin___"};
+        static std::string reserved[] = {"this", "___global___", "___builtin___"};
         /*
          * there are only so many reserved words
          * so for looping through it is fine

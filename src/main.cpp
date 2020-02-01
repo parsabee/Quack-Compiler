@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     try {
         ast::Driver drv(argv[0], output_file);
         if (json)
-            drv.json();
+            ast::Driver::json();
         else
             drv.compile();
     } catch (const std::exception &ex) {

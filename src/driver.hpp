@@ -50,7 +50,7 @@ namespace ast {
     public:
         explicit Driver(const char *input_file, const char *output_file = nullptr);
         void compile();
-        void json();
+        static void json();
         static bool assert_file_type(const char *file, const char *ext);
         ~Driver() {
             if (_file) fclose(_file);
