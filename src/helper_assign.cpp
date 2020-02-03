@@ -32,7 +32,7 @@ namespace ast {
                     std::string left_type = _assign->_lexpr->type_check(_st);
                     if (rhs_inferred != left_type && !rhs_type->has_ancestor(left_type, _st)) {
                         std::string sym = ident->get_text();
-                        if (_st.get_symbol(sym).second == VAR) {
+                        if (_st.get_symbol(sym).second == NON_STATIC) {
 
                             /* reassignment of a variable with different type
                              * we take least common ancestor */
@@ -52,7 +52,7 @@ namespace ast {
                     if (is_reserved(ident->get_text()))
                         throw ReservedWord(ident->get_text());
 
-                    _st.top()->add_symbol(ident->get_text(), rhs_inferred, VAR);
+                    _st.top()->add_symbol(ident->get_text(), rhs_inferred, NON_STATIC);
                 }
             } else if (_assign->_lexpr->type() != DOT) {
                 assert(false);
@@ -91,7 +91,7 @@ namespace ast {
                                                                     + " cannot be assigned to static type "
                                                                     + decl->_static_type->get_text());
                     } else
-                        _st.top()->add_symbol(var_name, decl->_static_type->get_text(), LET);
+                        _st.top()->add_symbol(var_name, decl->_static_type->get_text(), STATIC);
                 }
             } else if (decl->_lexpr->type() != DOT) {
                 assert(false);

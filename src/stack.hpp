@@ -34,6 +34,8 @@ namespace ast {
 
         bool has_symbol(const std::string& sym);
 
+        void update_symbol(const std::string &sym, const std::string &type, int is_static);
+
         std::pair<std::string, int> get_symbol(const std::string& sym);
 
         Class *get_class(const std::string& name);

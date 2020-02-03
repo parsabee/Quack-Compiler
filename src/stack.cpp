@@ -102,8 +102,10 @@ namespace ast {
     }
 
     std::string Stack::lca(std::string c1, std::string c2) {
-        Class *C1 = get_class(std::move(c1));
-        Class *C2 = get_class(std::move(c2));
+        if (c1 == c2)
+            return c1;
+        Class *C1 = get_class(c1);
+        Class *C2 = get_class(c2);
         std::vector<std::string> c1_ancestors;
         std::string super = C1->get_super();
         while (super != "Obj") {
@@ -133,7 +135,7 @@ namespace ast {
                     std::string type = i.second.first;
                     if (i.second.first != j.second.first)
                         type = lca(i.second.first, j.second.first);
-                    tmp->add_symbol(i.first, type, VAR);
+                    tmp->add_symbol(i.first, type, NON_STATIC);
                 }
             }
         }
@@ -147,6 +149,21 @@ namespace ast {
         }
         for (const auto& i : a->table) {
             top()->add_symbol(i.first, i.second.first, i.second.second);
+        }
+    }
+
+    void Stack::update_symbol(const std::string &sym, const std::string &type, int is_static) {
+        std::string new_type;
+        if (top()->has_symbol(sym)) {
+            if (top()->get_symbol(sym).second == STATIC) {
+                throw TypeError("redefining symbol with static type");
+            }
+            auto old_type = top()->get_symbol(sym).first;
+            new_type = lca(old_type, type);
+            top()->update_symbol(sym, new_type);
+        } else {
+            new_type = type;
+            top()->add_symbol(sym, type, is_static);
         }
     }
 }

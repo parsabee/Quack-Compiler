@@ -13,8 +13,8 @@
 namespace ast {
     /* different kinds of symbol */
     enum kinds {
-        LET, /*constants*/
-        VAR, /*variables*/
+        STATIC, /*constants*/
+        NON_STATIC, /*variables*/
         TYPE
     };
 

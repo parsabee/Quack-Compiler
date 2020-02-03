@@ -23,9 +23,9 @@ namespace ast {
 
     void SymbolTable::update_symbol(const std::string& sym, const std::string& typ) {
         if (table.count(sym) > 0) {
-            table.at(sym) = {typ, VAR};
+            table.at(sym) = {typ, NON_STATIC};
         } else {
-            throw SymbolNotFound(sym);
+            table.insert({sym, {typ, NON_STATIC}});
         }
     }
 

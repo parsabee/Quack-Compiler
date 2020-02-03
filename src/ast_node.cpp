@@ -149,13 +149,20 @@ namespace ast {
 
     void
     Formals::semantic_check(Stack &st) {
+        /* ===============================================
+         * semantics of Formals of a method:
+         * checking the type of every formal,
+         * if type was found, add the variable to the
+         * symbol table,
+         * otherwise, type not found.
+         * =============================================== */
         SymbolTable *symtable = st.top();
         for (auto formal: get_elements()) {
             /* Adding each formal to symbol table */
             std::string formal_type = formal->get_type()->get_text();
             if (!st.has_type(formal_type))
-                throw SymbolNotFound(formal_type);
-            symtable->add_symbol(formal->get_var()->get_text(), formal_type, VAR);
+                throw TypeNotFound(formal_type);
+            symtable->add_symbol(formal->get_var()->get_text(), formal_type, NON_STATIC);
         }
     }
 
@@ -217,7 +224,7 @@ namespace ast {
             std::string var = ast::CodegenContext::gen_variable(it->get_var()->get_text());
             ss << var;
             st.top()->gen_symbol(it->get_var()->get_text());
-            st.top()->add_symbol(it->get_var()->get_text(), it->get_type()->get_text(), LET);
+            st.top()->add_symbol(it->get_var()->get_text(), it->get_type()->get_text(), STATIC);
         }
         ss << " )";
         ctx.emit("obj_" + return_type + " " + method_name + ss.str() + " {\n");
@@ -242,9 +249,30 @@ namespace ast {
 
     void
     Assign::semantic_check(Stack &st) {
+        /* ===============================================
+         * <symbol> = <value>;
+         * <receiver.attribute> = <value>;
+         *
+         * semantics of an Assignment:
+         * if it is a dot, find it's receiver type and
+         * update the corresponding attribute
+         * if it is an ident, update symbol table
+         *
+         * if the types don't match, take least common ancestor
+         * of the two types.
+         * =============================================== */
         try {
-            auto ac = AssignChecker(this, st);
-            ac.type_check();
+            std::string rhs_type = _rexpr->type_check(st);
+            auto dot = dynamic_cast<Dot *>(_lexpr);
+            if (dot) {
+                auto receiver = dot->get_left()->type_check(st);
+                auto clss = st.get_class(receiver);
+                clss->update_attribute(dot->get_right()->get_text(), rhs_type, NON_STATIC, st);
+            } else {
+                auto ident = dynamic_cast<Ident *>(_lexpr);
+                assert(ident != nullptr);
+                st.update_symbol(ident->get_text(), rhs_type, NON_STATIC);
+            }
         } catch (const ast_exception &ex) {
             ERROR(this);
         }
@@ -269,9 +297,26 @@ namespace ast {
 
     void
     AssignDeclare::semantic_check(Stack &st) {
+        /* ===============================================
+         * <symbol>: <type> = <value>;
+         * <receiver.attribute>: <type> = <value>;
+         *
+         * semantics of assignment with type declaration:
+         * these have to be new assignments,
+         * reassignments leads to symbol redefinition error
+         * =============================================== */
         try {
-            auto ac = AssignChecker(this, st);
-            ac.type_check();
+            std::string rhs_type = _rexpr->type_check(st);
+            auto dot = dynamic_cast<Dot *>(_lexpr);
+            if (dot) {
+                auto receiver = dot->get_left()->type_check(st);
+                auto clss = st.get_class(receiver);
+                clss->update_attribute(dot->get_right()->get_text(), rhs_type, STATIC, st);
+            } else {
+                auto ident = dynamic_cast<Ident *>(_lexpr);
+                assert(ident != nullptr);
+                st.update_symbol(ident->get_text(), rhs_type, STATIC);
+            }
         } catch (const ast_exception &ex) {
             ERROR(this);
         }
@@ -304,10 +349,58 @@ namespace ast {
         ctx.emit("return (obj_" + type + ")" + ctx.get_last_temp() + ";\n");
     }
 
+    static bool
+    type_match (const std::string &t1, const std::string &t2, Stack &st) {
+        /* ===============================================
+         * helper function to determine if t1 matches t2:
+         *
+         * they match if t1 == t2
+         * if t1 > t2:
+         *    meaning if t2 is a subclass of t1
+         * =============================================== */
+        if (t1 == t2)
+            return true;
+        auto clss = st.get_class(t2); /* might throw error */
+        auto super = clss->get_super();
+        while (!super.empty()) {
+            clss = st.get_class(super);
+            super = clss->get_super();
+            if (super == t1)
+                return true;
+        }
+        return false;
+    }
+
     void
     Return::semantic_check(Stack &st) {
+        /* ===============================================
+         * return <expression>;
+         *
+         * semantics of return:
+         * this statement has to be within a method
+         * the type of expression has to match the
+         * return type of method
+         * =============================================== */
         try {
-            _expr->semantic_check(st);
+            auto environ = st.top()->get_name();
+            auto type = environ.substr(0, environ.find(':'));
+            auto method = environ.substr(environ.find(':') + 1, environ.length());
+
+            if (type == GLOBAL) {
+                throw TypeError("return found in the global scope");
+            } if (method.empty()) {
+                throw TypeError("return not being used inside a method");
+            }
+
+            auto clss = st.get_class(type);
+            for (auto m : clss->get_methods()->get_elements()) {
+                if (m->get_name() == method) {
+                    if (!type_match(m->get_return(),_expr->type_check(st), st)) {
+                        throw TypeError("mismatch between method return type and its return statement");
+                    }
+                    break;
+                }
+            }
         }
         catch (const ast_exception &ex) {
             ERROR(this);
@@ -332,20 +425,21 @@ namespace ast {
          * } else {
          *   <statements>
          * }
-         * typechecking rules:
-         *  1) cond must be boolean
-         *  2) call semantic_check() on true_part and false_part
+         * semantics of if:
+         * the condition has to be boolean
+         * if a symbol or class attribute is defined on both
+         * true and false paths, then it's added to the current
+         * symbol table.
          * ===================================================== */
 
         try {
-            _cond->semantic_check(st);
             if (_cond->type_check(st) != "Boolean")
                 throw TypeError("if statements condition isn't Boolean");
-            auto *true_table = new SymbolTable(st.top()->get_name());
+            auto true_table = new SymbolTable(st.top()->get_name());
             st.push(true_table);
             _true_part->semantic_check(st);
             (void) st.pop();
-            auto *false_table = new SymbolTable(st.top()->get_name());
+            auto false_table = new SymbolTable(st.top()->get_name());
             st.push(false_table);
             _false_part->semantic_check(st);
             (void) st.pop();
@@ -415,13 +509,12 @@ namespace ast {
          * while (<cond>) {
          *  <statements>
          * }
-         * typechecking rule:
+         * semantics of While loop:
          *  1) cond must be boolean
-         *  2) call semantic_check() on statements
+         *  2) check semantics of statements
          * ===================================================== */
 
         try {
-            _cond->semantic_check(st);
             if (_cond->type_check(st) != "Boolean")
                 throw TypeError("while loops condition isn't Boolean");
 
@@ -491,9 +584,9 @@ namespace ast {
 
     std::string
     Load::type_check(Stack &st) {
-/* ======================
- * return whatever _loc is
- * ====================== */
+        /* ======================
+         * return whatever _loc is
+         * ====================== */
         return _loc->type_check(st);
     }
 
@@ -515,9 +608,9 @@ namespace ast {
             return "Nothing";
         } else if (_text == "this") {
             auto environ = st.top()->get_name();
-            auto type = environ.substr(0, environ.find(':'));
-            if (type == GLOBAL)
+            if (environ == GLOBAL)
                 throw TypeError("usage of `this' outside of a class");
+            auto type = environ.substr(0, environ.find(':'));
             return type;
         } else {
             auto t = st.get_symbol(_text); /* SymbolNotFound may be thrown */
@@ -645,6 +738,29 @@ namespace ast {
     Class::code_gen(CodegenContext &ctx, Stack &st) {
         auto cg = ClassGenerator(this, st, ctx);
         cg.code_gen();
+    }
+
+    void Class::update_attribute(const std::string &attr,
+                                 const std::string &type,
+                                 kinds kind,
+                                 Stack &st) {
+        /*
+         * private method accessible to Assign classes
+         * for updating the attributes of a class
+         */
+        if (_attrs->count(attr) == 0) {
+            _attrs->insert({attr, {type, kind}});
+        } else {
+            if (_attrs->at(attr).second == STATIC) {
+                throw TypeError("redefining symbol with static type");
+            }
+            if (kind == STATIC) {
+                throw TypeError("statically declaring an already defined symbol");
+            }
+            std::string &old_type = _attrs->at(attr).first;
+            std::string new_type = st.lca(old_type, type);
+            _attrs->at(attr) = {new_type, NON_STATIC};
+        }
     }
 
     void
@@ -920,6 +1036,11 @@ namespace ast {
 
     void
     Dot::semantic_check(Stack &st) {
+        /* ===============================================
+         * semantics of a Dot:
+         * left side is an object of type T,
+         * right side is an attribute of type T
+         * =============================================== */
         try {
             /* if we can infer it's type then it's legal */
             (void) this->type_check(st);

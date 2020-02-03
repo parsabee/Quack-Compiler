@@ -658,8 +658,9 @@ namespace ast {
 
     class Class : public ASTNode {
         friend class ClassChecker;
-
         friend class ClassGenerator;
+        friend class Assign;
+        friend class AssignDeclare;
 
         Ident *_name;
         Ident *_super;
@@ -668,12 +669,15 @@ namespace ast {
         /* attributes of class,
          * a name => type mapping */
         std::unordered_map<std::string, std::string> *_attributes;
+        std::unordered_map<std::string, std::pair<std::string, kinds>> *_attrs;
         bool _builtin;
         int _line_no;
     public:
         Class(Ident *name, Ident *super, Method *constuctor, Methods *methods, int line_no, bool builtin = false) :
                 _name{name}, _super{super}, _constructor{constuctor}, _methods{methods},
-                _attributes{new std::unordered_map<std::string, std::string>}, _builtin{builtin}, _line_no{line_no} {}
+                _attributes{new std::unordered_map<std::string, std::string>},
+                _attrs{new std::unordered_map<std::string, std::pair<std::string, attr_type>>},_builtin{builtin},
+                _line_no{line_no} {}
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
@@ -758,7 +762,14 @@ namespace ast {
             delete _constructor;
             delete _methods;
             delete _attributes;
+            delete _attrs;
         }
+
+    private:
+        void update_attribute(const std::string &attr,
+                              const std::string &type,
+                              kinds kind,
+                              Stack &st);
     };
 
     class Classes : public Seq<Class> {

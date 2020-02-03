@@ -190,7 +190,7 @@ namespace ast {
         for (auto formal: tmp_formals->get_elements()) {
             if (!first) str += ", ";
             first = false;
-            symtable->add_symbol(formal->get_var()->get_text(), formal->get_type()->get_text(), LET);
+            symtable->add_symbol(formal->get_var()->get_text(), formal->get_type()->get_text(), STATIC);
             str += "obj_" + formal->get_type()->get_text() + " " + formal->get_var()->get_text();
             _st.top()->gen_symbol(formal->get_var()->get_text());
         }
