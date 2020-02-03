@@ -42,7 +42,7 @@ namespace ast {
 
         bool has_symbol(const std::string& sym);
 
-        bool has_type(std::string type);
+        bool has_type(const std::string& type);
 
         std::string get_name() {
             return _name;

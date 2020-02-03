@@ -4,9 +4,7 @@
 
 namespace ast {
     bool SymbolTable::is_generated(const std::string& sym) {
-        if (generated.count(sym) > 0)
-            return true;
-        return false;
+        return generated.count(sym) > 0;
     }
 
     void SymbolTable::gen_symbol(const std::string& sym) {
@@ -32,13 +30,13 @@ namespace ast {
     }
 
     bool SymbolTable::has_symbol(const std::string& sym) {
-        return table.count(sym) == 0 ? false : true;
+        return table.count(sym) != 0;
     }
 
-    bool SymbolTable::has_type(std::string sym) {
+    bool SymbolTable::has_type(const std::string& sym) {
         bool status = false;
         try {
-            auto pair = get_symbol(std::move(sym));
+            auto pair = get_symbol(sym);
             if (pair.second == TYPE)
                 status = true;
         }

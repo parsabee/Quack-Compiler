@@ -19,7 +19,7 @@ namespace ast {
     AssignChecker::assign_check() {
         /* semantics checking */
         try {
-            std::string rhs_inferred = _assign->get_right()->infer(_st);
+            std::string rhs_inferred = _assign->get_right()->type_check(_st);
             check_scope();
             Class *rhs_type = _st.get_class(rhs_inferred);
             auto *ident = dynamic_cast<Ident *>(_assign->_lexpr);
@@ -29,7 +29,7 @@ namespace ast {
                 try {
 
                     /* reassignment */
-                    std::string left_type = _assign->_lexpr->infer(_st);
+                    std::string left_type = _assign->_lexpr->type_check(_st);
                     if (rhs_inferred != left_type && !rhs_type->has_ancestor(left_type, _st)) {
                         std::string sym = ident->get_text();
                         if (_st.get_symbol(sym).second == VAR) {
@@ -73,7 +73,7 @@ namespace ast {
         try {
             check_scope();
 
-            std::string inferred_type = decl->get_right()->infer(_st); /* Inferring type of right expr */
+            std::string inferred_type = decl->get_right()->type_check(_st); /* Inferring type of right expr */
             Class *inferred_class = _st.get_class(inferred_type);
 
             auto *_lexpr_ident = dynamic_cast<Ident *>(decl->_lexpr);
@@ -117,7 +117,7 @@ namespace ast {
 
     void AssignGenerator::code_gen() {
 
-        std::string var_type = _assign->get_left()->infer(_st);
+        std::string var_type = _assign->get_left()->type_check(_st);
         _assign->get_right()->code_gen(_ctx, _st);
         std::string right_tmp = _ctx.get_last_temp();
 
@@ -141,7 +141,7 @@ namespace ast {
         auto left = dynamic_cast<Ident *>(_assign->get_left());
         assert (left != nullptr);
         try {
-            _ctx.declare_variable(left->infer(_st), left->get_text(), _st);
+            _ctx.declare_variable(left->type_check(_st), left->get_text(), _st);
         } catch (SymbolNotFound &ex) {
             assert(false); /* after type checking, we can't have symbol not found*/
         }

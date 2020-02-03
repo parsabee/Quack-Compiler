@@ -26,7 +26,7 @@ namespace ast {
             for (auto it : _method->_statements->get_elements()) {
                 if (it->type() == RETURN) {
                     _method->_has_return = true;
-                    std::string actual_return = it->infer(_st);
+                    std::string actual_return = it->type_check(_st);
                     if (actual_return != formal_return) {
                         Class *ar_class = _st.get_class(actual_return);
                         if (!ar_class->has_ancestor(formal_return, _st)) {
@@ -47,8 +47,8 @@ namespace ast {
             }
 
             /* typechecking formals, and body */
-            _method->_formals->type_check(_st);
-            _method->_statements->type_check(_st);
+            _method->_formals->semantic_check(_st);
+            _method->_statements->semantic_check(_st);
 
             delete _st.pop();
         }
@@ -70,8 +70,8 @@ namespace ast {
         }
 
         for (int i = 0; i < actuals_vector.size(); i++) {
-            actuals_vector[i]->type_check(st);
-            std::string actuals_type = actuals_vector[i]->infer(st);
+            actuals_vector[i]->semantic_check(st);
+            std::string actuals_type = actuals_vector[i]->type_check(st);
             std::string formals_type = formals_vector[i]->get_type()->get_text();
             if (actuals_type != formals_type) {
                 Class *actuals_class = st.get_class(actuals_type);

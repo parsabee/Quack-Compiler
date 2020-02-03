@@ -88,7 +88,7 @@ namespace ast {
                             throw TypeError();
                         }
                     }
-                    i->get_formals()->type_check(_st);
+                    i->get_formals()->semantic_check(_st);
                     /* checking number of arguments */
                     if (i->get_formals()->len() != m->get_formals()->len()) {
                         std::cerr << "method '" << _class->get_name() << "::" << i->get_name()
@@ -148,7 +148,7 @@ namespace ast {
             _st.push(symtable);
 
             check_inheritance();
-            _class->get_constructor()->get_formals()->type_check(_st);
+            _class->get_constructor()->get_formals()->semantic_check(_st);
 
             /* parsing every statment
              * typechecking and finding attributes */
@@ -158,7 +158,7 @@ namespace ast {
 
             check_attrs_initialized();
             check_methods();
-            _class->get_methods()->type_check(_st);
+            _class->get_methods()->semantic_check(_st);
 
             delete _st.pop(); /* done with the current environment */
         }

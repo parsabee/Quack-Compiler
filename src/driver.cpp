@@ -15,8 +15,8 @@ namespace ast {
             for (auto i : _pgm->_classes->get_elements())
                 global->add_symbol(i->get_name(), i->get_name(), TYPE);
 
-            _pgm->_classes->type_check(_st);
-            _pgm->_statements->type_check(_st);
+            _pgm->_classes->semantic_check(_st);
+            _pgm->_statements->semantic_check(_st);
         }
         catch (const DuplicateSymbol &ex) {
             report::error(ex.what());
@@ -74,7 +74,7 @@ namespace ast {
         _ctx.emit("/* ============================== Main ============================== */\n\n");
         _ctx.emit("int main (int argc, char *argv[]) {\n");
         _ctx.indent();
-        _pgm->_statements->type_check(_st); /* do this to fill the symbol table */
+        _pgm->_statements->semantic_check(_st); /* do this to fill the symbol table */
         _pgm->_statements->code_gen(_ctx, _st);
         _ctx.emit("exit(0);\n");
         _ctx.dedent();

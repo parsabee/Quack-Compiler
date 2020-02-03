@@ -5,12 +5,14 @@
 #include "helper_method.hpp"
 #include "helper_class.hpp"
 
+#define GLOBAL "___global___"
+#define BUILTIN "___builtin___"
 
 namespace ast {
 
     bool
     is_reserved(const std::string& str) {
-        static std::string reserved[] = {"this", "___global___", "___builtin___"};
+        static std::string reserved[] = {GLOBAL, BUILTIN};
         /*
          * there are only so many reserved words
          * so for looping through it is fine
@@ -88,16 +90,15 @@ namespace ast {
 
         /* Type Checking */
 
-        std::string global_str = "___global___";
-        auto *global = new SymbolTable(global_str);
+        auto *global = new SymbolTable(GLOBAL);
         st.push(global);
         try {
             /* adding every type to the global environment */
             for (auto i : _classes->get_elements())
                 global->add_symbol(i->get_name(), i->get_name(), TYPE);
 
-            _classes->type_check(st);
-            _statements->type_check(st);
+            _classes->semantic_check(st);
+            _statements->semantic_check(st);
         }
         catch (const DuplicateSymbol &ex) {
             report::error(ex.what());
@@ -106,7 +107,7 @@ namespace ast {
         /* Code Generation */
         st.clear();
         if (report::num_errors == 0) {
-            global = new SymbolTable(global_str);
+            global = new SymbolTable(GLOBAL);
             ctx.emit("#include <stdlib.h>\n");
             ctx.emit("#include \"builtins.h\"\n\n"); /* preamble */
             if (_classes->len() > 5) /* 5 builtin classes */
@@ -128,7 +129,7 @@ namespace ast {
             ctx.emit(    "/* ============================== Main ============================== */\n\n");
             ctx.emit("int main (int argc, char *argv[]) {\n");
             ctx.indent();
-            _statements->type_check(st); /* do this to fill the symbol table */
+            _statements->semantic_check(st); /* do this to fill the symbol table */
             _statements->code_gen(ctx, st);
             ctx.emit("exit(0);\n");
             ctx.dedent();
@@ -147,15 +148,14 @@ namespace ast {
     }
 
     void
-    Formals::type_check(Stack &st) {
+    Formals::semantic_check(Stack &st) {
         SymbolTable *symtable = st.top();
         for (auto formal: get_elements()) {
             /* Adding each formal to symbol table */
             std::string formal_type = formal->get_type()->get_text();
             if (!st.has_type(formal_type))
-                report::error("*** SymbolNotFound " + formal_type);
-            else
-                symtable->add_symbol(formal->get_var()->get_text(), formal_type, VAR);
+                throw SymbolNotFound(formal_type);
+            symtable->add_symbol(formal->get_var()->get_text(), formal_type, VAR);
         }
     }
 
@@ -192,16 +192,20 @@ namespace ast {
     }
 
     void
-    Method::type_check(Stack &st) {
-        auto mc = MethodChecker(this, st);
-        mc.type_check();
+    Method::semantic_check(Stack &st) {
+        try {
+            auto mc = MethodChecker(this, st);
+            mc.type_check();
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
     Method::code_gen(CodegenContext &ctx, Stack &st) {
 
         std::string str = st.top()->get_name();
-        auto *symtable = new SymbolTable(str + ":" + _name->get_text());
+        auto symtable = new SymbolTable(str + ":" + _name->get_text());
         st.push(symtable);
         std::string method_name = _owner + "_method_" + _name->get_text();
         std::string return_type = _returns->get_text();
@@ -237,9 +241,13 @@ namespace ast {
     }
 
     void
-    Assign::type_check(Stack &st) {
-        auto ac = AssignChecker(this, st);
-        ac.type_check();
+    Assign::semantic_check(Stack &st) {
+        try {
+            auto ac = AssignChecker(this, st);
+            ac.type_check();
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
@@ -260,9 +268,13 @@ namespace ast {
     }
 
     void
-    AssignDeclare::type_check(Stack &st) {
-        auto ac = AssignChecker(this, st);
-        ac.type_check();
+    AssignDeclare::semantic_check(Stack &st) {
+        try {
+            auto ac = AssignChecker(this, st);
+            ac.type_check();
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
@@ -293,9 +305,9 @@ namespace ast {
     }
 
     void
-    Return::type_check(Stack &st) {
+    Return::semantic_check(Stack &st) {
         try {
-            _expr->type_check(st);
+            _expr->semantic_check(st);
         }
         catch (const ast_exception &ex) {
             ERROR(this);
@@ -313,7 +325,7 @@ namespace ast {
 
 
     void
-    If::type_check(Stack &st) {
+    If::semantic_check(Stack &st) {
         /* =====================================================
          * if (<cond>) {
          *   <statements>
@@ -322,31 +334,33 @@ namespace ast {
          * }
          * typechecking rules:
          *  1) cond must be boolean
-         *  2) call type_check() on true_part and false_part
+         *  2) call semantic_check() on true_part and false_part
          * ===================================================== */
 
-        _cond->type_check(st);
-        if (_cond->infer(st) != "Boolean")
-            report::error("*** TypeError, if statements condition isn't Boolean");
-        std::string str = st.top()->get_name();
-        std::string environment = str.substr(0, str.find(':'));
-        auto *true_table = new SymbolTable(environment);
-        st.push(true_table);
-        _true_part->type_check(st);
-        (void) st.pop();
-        auto *false_table = new SymbolTable(environment);
-        st.push(false_table);
-        _false_part->type_check(st);
-        (void) st.pop();
+        try {
+            _cond->semantic_check(st);
+            if (_cond->type_check(st) != "Boolean")
+                throw TypeError("if statements condition isn't Boolean");
+            auto *true_table = new SymbolTable(st.top()->get_name());
+            st.push(true_table);
+            _true_part->semantic_check(st);
+            (void) st.pop();
+            auto *false_table = new SymbolTable(st.top()->get_name());
+            st.push(false_table);
+            _false_part->semantic_check(st);
+            (void) st.pop();
 
-        /* collecting symbols defined _input_file both true and false branches */
-        SymbolTable *ture_false_intersection = st.intersection(true_table, false_table);
-        /* merging intersection with the top-most symbol table */
-        st.merge(ture_false_intersection);
+            /* collecting symbols defined _input_file both true and false branches */
+            SymbolTable *ture_false_intersection = st.intersection(true_table, false_table);
+            /* merging intersection with the top-most symbol table */
+            st.merge(ture_false_intersection);
 
-        delete ture_false_intersection;
-        delete true_table;
-        delete false_table;
+            delete ture_false_intersection;
+            delete true_table;
+            delete false_table;
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
@@ -367,8 +381,8 @@ namespace ast {
         true_label = ctx.gen_true();
         false_label = ctx.gen_false();
         end_label = ctx.gen_end();
-        _true_part->type_check(st);
-        _false_part->type_check(st);
+        _true_part->semantic_check(st);
+        _false_part->semantic_check(st);
         forward_ref(ctx, st, _true_part, "true");
         forward_ref(ctx, st, _false_part, "false");
         _cond->code_gen(ctx, st);
@@ -396,20 +410,27 @@ namespace ast {
     }
 
     void
-    While::type_check(Stack &st) {
+    While::semantic_check(Stack &st) {
         /* =====================================================
          * while (<cond>) {
          *  <statements>
          * }
          * typechecking rule:
          *  1) cond must be boolean
-         *  2) call type_check() on statements
+         *  2) call semantic_check() on statements
          * ===================================================== */
 
-        _cond->type_check(st);
-        if (_cond->infer(st) != "Boolean")
-            report::error("*** TypeError", "while loops condition isn't Boolean");
-        _body->type_check(st);
+        try {
+            _cond->semantic_check(st);
+            if (_cond->type_check(st) != "Boolean")
+                throw TypeError("while loops condition isn't Boolean");
+
+            st.push(new SymbolTable(st.top()->get_name()));
+            _body->semantic_check(st);
+            delete st.pop();
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
@@ -432,7 +453,7 @@ namespace ast {
         ctx.emit("goto " + if_label + ";\n");
         ctx.emit("\n" + loop_label + ": /* while loop */ ;\n");
         ctx.indent();
-        _body->type_check(st);
+        _body->semantic_check(st);
         _body->code_gen(ctx, st);
         ctx.dedent();
         ctx.emit("\n" + if_label + ": /* condition test */ ;\n");
@@ -469,16 +490,16 @@ namespace ast {
     }
 
     std::string
-    Load::infer(Stack &st) {
+    Load::type_check(Stack &st) {
 /* ======================
  * return whatever _loc is
  * ====================== */
-        return _loc->infer(st);
+        return _loc->type_check(st);
     }
 
     void
-    Load::type_check(Stack &st) {
-        _loc->type_check(st);
+    Load::semantic_check(Stack &st) {
+        _loc->semantic_check(st);
     }
 
     void
@@ -487,19 +508,19 @@ namespace ast {
     }
 
     std::string
-    Ident::infer(Stack &st) {
-        if (_text == "true" || _text == "false")
+    Ident::type_check(Stack &st) {
+        if (_text == "true" || _text == "false") {
             return "Boolean";
-        else if (_text == "none")
+        } else if (_text == "none") {
             return "Nothing";
-        else {
-            if (_text == "this")
-                throw ReservedWord(_text);
+        } else if (_text == "this") {
+            auto environ = st.top()->get_name();
+            auto type = environ.substr(0, environ.find(':'));
+            if (type == GLOBAL)
+                throw TypeError("usage of `this' outside of a class");
+            return type;
+        } else {
             auto t = st.get_symbol(_text); /* SymbolNotFound may be thrown */
-            if (t.second != LET &&
-                t.second != VAR) { /* error, can't be anything but VAR or LET, e.g TYPE or METHOD are invalid */
-                throw TypeError();
-            }
             return t.first;
         }
     }
@@ -512,17 +533,17 @@ namespace ast {
     }
 
     void
-    Ident::type_check(Stack &st) {
+    Ident::semantic_check(Stack &st) {
         /* =====================================================
          * typechecking rules:
          *  1) check if symbol is a keyword e.g. "true"
          *  2) check if symbol exists
          * ===================================================== */
-
-        if (_text == "true" || _text == "false" || _text == "none")
-            return;
-        if (!st.has_symbol(_text))
-            throw SymbolNotFound(_text);
+        try {
+            (void) type_check(st);
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
@@ -554,10 +575,10 @@ namespace ast {
     }
 
     void
-    Classes::type_check(Stack &st) {
+    Classes::semantic_check(Stack &st) {
         for (auto el: _elements) {
             if (!el->is_builtin())
-                el->type_check(st);
+                el->semantic_check(st);
         }
     }
 
@@ -579,7 +600,7 @@ namespace ast {
 
     bool
     Class::has_attr(const std::string& attr) {
-        return _attributes->count(attr) ? true : false;
+        return _attributes->count(attr) != 0;
     }
 
     bool
@@ -611,9 +632,13 @@ namespace ast {
     }
 
     void
-    Class::type_check(Stack &st) {
-        auto cc = ClassChecker(this, st);
-        cc.type_check();
+    Class::semantic_check(Stack &st) {
+        try {
+            auto cc = ClassChecker(this, st);
+            cc.type_check();
+        } catch (const ast_exception &ex) {
+            ERROR(this);
+        }
     }
 
     void
@@ -633,7 +658,7 @@ namespace ast {
 
     Method *
     Call::get_method(Stack &st) {
-        std::string receiver_type = _receiver->infer(st);
+        std::string receiver_type = _receiver->type_check(st);
         Class *receiver_class = st.get_class(receiver_type);
         Method *calling_method = nullptr;
         Class *cur = receiver_class;
@@ -650,22 +675,24 @@ namespace ast {
 
             cur = st.get_class(cur->get_super());
         }
-        return calling_method;
+        if (calling_method)
+            return calling_method;
+        throw MethodNotFound(_method->get_text());
     }
 
     std::string
-    Call::infer(Stack &st) {
-        std::string receiver_type = this->get_receiver()->infer(st);
-        Class *receiver_class = st.get_class(receiver_type);
-        Method *method = receiver_class->get_method(this->get_method_name());
+    Call::type_check(Stack &st) {
+        auto receiver_type = get_receiver()->type_check(st);
+        auto receiver_class = st.get_class(receiver_type);
+        auto method = receiver_class->get_method(get_method_name());
         if (method)
             return method->get_return();
 
-        throw MethodNotFound(this->get_method_name());
+        throw MethodNotFound(get_method_name());
     }
 
     void
-    Call::type_check(Stack &st) {
+    Call::semantic_check(Stack &st) {
         /* =====================================================
          * <object>.<method>(<args>)
          * typechecking rules:
@@ -675,16 +702,10 @@ namespace ast {
          * ===================================================== */
 
         try {
-            _receiver->type_check(st);
-            std::string receiver_type = _receiver->infer(st);
+            _receiver->semantic_check(st);
+            std::string receiver_type = _receiver->type_check(st);
             Method *calling_method = get_method(st);
-            if (calling_method != nullptr)
-                MethodChecker::call_check(_actuals, calling_method, st);
-            else {
-                std::cerr << "type " << receiver_type << " has no method named "
-                          << _method->get_text();
-                throw TypeError();
-            }
+            MethodChecker::call_check(_actuals, calling_method, st);
         }
         catch (const ast_exception &ex) {
             ERROR(this);
@@ -700,7 +721,7 @@ namespace ast {
          * obj_<method_return_type> _tmp___x =
          *    _var___<var_name>->clazz-><method>->(arg1, arg2 ...);
          * ===================================================== */
-        std::string receiver_type = _receiver->infer(st);
+        std::string receiver_type = _receiver->type_check(st);
         Class *receiver_class = st.get_class(receiver_type);
         Method *calling_method = nullptr;
         Class *cur = receiver_class;
@@ -762,7 +783,7 @@ namespace ast {
     }
 
     std::string
-    Construct::infer(Stack &st) {
+    Construct::type_check(Stack &st) {
         std::string method = _method->get_text();
         if (st.has_type(method))
             return method;
@@ -770,7 +791,7 @@ namespace ast {
     }
 
     void
-    Construct::type_check(Stack &st) {
+    Construct::semantic_check(Stack &st) {
         try {
             std::string type = _method->get_text();
             Method *constructor = st.get_class(type)->get_constructor();
@@ -864,7 +885,7 @@ namespace ast {
     }
 
     std::string
-    Dot::infer(Stack &st) {
+    Dot::type_check(Stack &st) {
         /* ===============================================
          * if left side is "this":
          *  then the type has to be the current scope;
@@ -880,30 +901,13 @@ namespace ast {
          * =============================================== */
 
         std::string left_type;
-        try {
-            left_type = get_left()->infer(st);
-        }
-        catch (const ReservedWord &ex) {
-            std::string str = st.top()->get_name();
-            std::string environment = str.substr(0, str.find(':'));
-            if (environment == "___global___") {
-                std::cerr << "accessing private data _input_file global scope\n";
-                throw TypeError();
-            } else
-                left_type = environment;
-        }
-        Class *left_class = st.get_class(left_type);
-        if (left_class) {
-            std::string attr = get_right()->get_text();
-            if (left_class->has_attr(attr))
-                return left_class->get_attrs()->at(attr);
-            else {
-                std::cerr << "type '" << left_type << "' has no attribute '"
-                          << attr << "'\n";
-                throw AttributeError(attr);
-            }
-        }
-        assert(false);
+        left_type = _left->type_check(st);
+        auto left_class = st.get_class(left_type);
+        auto attr = _right->get_text();
+        if (left_class->has_attr(attr))
+            return left_class->get_attrs()->at(attr);
+        else
+            throw AttributeError(attr);
     }
 
     void
@@ -915,10 +919,10 @@ namespace ast {
     }
 
     void
-    Dot::type_check(Stack &st) {
+    Dot::semantic_check(Stack &st) {
         try {
             /* if we can infer it's type then it's legal */
-            (void) this->infer(st);
+            (void) this->type_check(st);
         }
         catch (const ast_exception &ex) {
             ERROR(this);
@@ -931,7 +935,7 @@ namespace ast {
         std::string left_tmp = ctx.get_last_temp();
         std::string type;
         try {
-            type = _left->infer(st);
+            type = _left->type_check(st);
         }
         catch (const ReservedWord &ex) {
             std::string str = st.top()->get_name();

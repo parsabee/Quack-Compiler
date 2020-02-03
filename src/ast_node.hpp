@@ -118,11 +118,11 @@ namespace ast {
 
         virtual int get_line() = 0;
 
-        virtual std::string infer(Stack &st) = 0;
+        virtual std::string type_check(Stack &st) = 0;
 
         virtual void json(std::ostream &out, PrintContext &ctx) = 0;
 
-        virtual void type_check(Stack &st) = 0;
+        virtual void semantic_check(Stack &st) = 0;
 
         virtual void code_gen(CodegenContext &ctx, Stack &st) = 0;
 
@@ -168,7 +168,7 @@ namespace ast {
         }
 
         std::string
-        infer(Stack &st) override {
+        type_check(Stack &st) override {
             std::cerr << "Seq: nothing to be inferred\n";
             assert(false);
         }
@@ -188,9 +188,9 @@ namespace ast {
         }
 
         void
-        type_check(Stack &st) override {
+        semantic_check(Stack &st) override {
             for (Kind *el: _elements) {
-                el->type_check(st);
+                el->semantic_check(st);
             }
         }
 
@@ -224,11 +224,11 @@ namespace ast {
         explicit Ident(std::string txt, int line_no) :
                 _text{std::move(std::move(txt))}, _line_no{line_no} {}
 
-        std::string infer(Stack &st) override;
+        std::string type_check(Stack &st) override;
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -287,9 +287,8 @@ namespace ast {
             return _type;
         }
 
-        std::string infer(Stack &st) override {
-            std::cerr << "Formal: nothing to be inferred\n";
-            assert(false);
+        std::string type_check(Stack &st) override {
+            return _type->get_text();
         }
 
         std::string get_signature() override {
@@ -300,7 +299,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
@@ -314,7 +313,7 @@ namespace ast {
     public:
         explicit Formals(int line_no) : Seq("Formals", line_no) {}
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         std::string get_signature() override {
             std::string sig;
@@ -347,7 +346,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -398,8 +397,8 @@ namespace ast {
         }
 
         std::string
-        infer(Stack &st) override {
-            return _returns->infer(st);
+        type_check(Stack &st) override {
+            return _returns->type_check(st);
         }
 
         ~Method() override {
@@ -416,6 +415,11 @@ namespace ast {
     };
 
     class Statement : public ASTNode {
+    public:
+        std::string type_check(Stack &st) override {
+            std::cerr << "Statement: nothing to be inferred\n";
+            assert(false);
+        }
     };
 
     class Assign : public Statement {
@@ -445,14 +449,9 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override {
-            std::cerr << "Assign: nothing to be inferred\n";
-            assert(false);
-        }
-
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -480,15 +479,9 @@ namespace ast {
 
         int type() override { return ASSIGN_DECLARE; }
 
-        std::string infer(Stack &st) override {
-            std::cerr << "void ast::AssignDeclare::infer(InferContext& _ctx, Stack& st)" <<
-                      "\n*** Nothing to be inferred ***\n";
-            assert(false);
-        }
-
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -522,11 +515,11 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override;
+        std::string type_check(Stack &st) override;
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -547,7 +540,7 @@ namespace ast {
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         int
         type() override {
@@ -565,8 +558,8 @@ namespace ast {
         }
 
         std::string
-        infer(Stack &st) override {
-            return _expr->infer(st);
+        type_check(Stack &st) override {
+            return _expr->type_check(st);
         }
 
         std::string
@@ -598,11 +591,6 @@ namespace ast {
             return IF;
         }
 
-        std::string infer(Stack &st) override {
-            std::cerr << "If: nothing to be inferred\n";
-            assert(false);
-        }
-
         Block *get_true() const {
             return _true_part;
         }
@@ -613,7 +601,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -642,11 +630,6 @@ namespace ast {
             return WHILE;
         }
 
-        std::string infer(Stack &st) override {
-            std::cerr << "While: nothing to be inferred\n";
-            assert(false);
-        }
-
         int get_line() override {
             return _line_no;
         }
@@ -657,7 +640,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -694,7 +677,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -758,8 +741,8 @@ namespace ast {
         }
 
         std::string
-        infer(Stack &st) override {
-            return _name->infer(st);
+        type_check(Stack &st) override {
+            return _name->type_check(st);
         }
 
         std::string get_signature() override {
@@ -782,7 +765,7 @@ namespace ast {
     public:
         explicit Classes(int line_no) : Seq<Class>("Classes", line_no) {}
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
     };
@@ -797,7 +780,7 @@ namespace ast {
             return INT_CONST;
         }
 
-        std::string infer(Stack &st) override {
+        std::string type_check(Stack &st) override {
             return "Int";
         }
 
@@ -807,7 +790,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -833,14 +816,14 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override {
+        std::string type_check(Stack &st) override {
             std::cerr << "Type_Alternative: Nothing to be inferred\n";
             assert(false);
         }
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
@@ -876,14 +859,9 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override {
-            std::cerr << "Typecase: nothing to be inferred\n";
-            assert(false);
-        }
-
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
@@ -912,13 +890,13 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override {
+        std::string type_check(Stack &st) override {
             return "String";
         }
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -954,9 +932,9 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        std::string infer(Stack &st) override;
+        std::string type_check(Stack &st) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -997,11 +975,11 @@ namespace ast {
         explicit Call(Expr *receiver, Ident *method, Actuals *actuals, int line_no) :
                 _receiver{receiver}, _method{method}, _actuals{actuals}, _line_no{line_no} {}
 
-        std::string infer(Stack &st) override;
+        std::string type_check(Stack &st) override;
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
@@ -1064,13 +1042,13 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override {
+        std::string type_check(Stack &st) override {
             return "Boolean";
         }
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
@@ -1109,7 +1087,7 @@ namespace ast {
             return NOT;
         }
 
-        std::string infer(Stack &st) override {
+        std::string type_check(Stack &st) override {
             return "Boolean";
         }
 
@@ -1119,7 +1097,7 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {}
+        void semantic_check(Stack &st) override {}
 
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
@@ -1142,11 +1120,11 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override;
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
-        std::string infer(Stack &st) override;
+        std::string type_check(Stack &st) override;
 
         Expr *
         get_left() const {
@@ -1200,14 +1178,14 @@ namespace ast {
             return _line_no;
         }
 
-        std::string infer(Stack &st) override {
+        std::string type_check(Stack &st) override {
             std::cerr << "Program: nothing to be inferred\n";
             assert(false);
         }
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void type_check(Stack &st) override {
+        void semantic_check(Stack &st) override {
             std::cerr << "Program: nothing to be typechecked\n";
             assert(false);
         }

@@ -19,7 +19,7 @@ namespace ast {
                 auto *ident = dynamic_cast<Ident *>(load->get_loc()); /* could be something else */
                 if (ident) {
                     if (ident->get_text() == "this") {
-                        std::string type = assign->get_right()->infer(_st);
+                        std::string type = assign->get_right()->type_check(_st);
                         std::string attr = dot->get_right()->get_text();
                         if (assign->type() == ASSIGN_DECLARE) {
                             auto *declare = dynamic_cast<AssignDeclare *>(assign);
@@ -104,7 +104,7 @@ namespace ast {
         _st.push(tmp_symtable);
         for (auto it : statements->get_elements()) {
             parse_statement(it, _attrs);
-            it->type_check(_st);
+            it->semantic_check(_st);
         }
         delete _st.pop(); /* done with this environment */
     }
