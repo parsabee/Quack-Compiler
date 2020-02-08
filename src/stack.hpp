@@ -2,37 +2,37 @@
 #define _STACK_H_
 
 #include "all.hpp"
-#include "symtable.hpp"
+#include "environment.hpp"
 #include "ast_node.hpp"
 #include "errors.hpp"
 #include "qk_builtins.hpp"
 
 namespace ast {
-    class Classes; /* forward reference */
     class Class; /* forward reference */
 
     class Stack {
-        Classes *_classes; /* list of classes */
-        std::vector<SymbolTable *> _stack; /* the program stack */
+        std::unordered_map<std::string, Class *> _types;
+        std::vector<Environment *> _stack; /* the program stack */
         int _size;
     public:
-        explicit Stack(Classes *classes);
-
+        Stack();
         ~Stack();
 
         /* typical stack methods */
-        void push(SymbolTable *st);
+        void push(Environment *st);
 
-        SymbolTable *pop();
+        Environment *pop();
 
-        SymbolTable *top();
+        Environment *top();
 
         void clear();
+
+        void assert_has_type(const std::string& sym);
 
         /* searching the entire stack for sym */
         bool has_type(const std::string& sym);
 
-        bool has_symbol(const std::string& sym);
+        void add_type(const std::string& type, Class *cls);
 
         void update_symbol(const std::string &sym, const std::string &type, int is_static);
 
@@ -41,11 +41,11 @@ namespace ast {
         Class *get_class(const std::string& name);
 
         /* lowest-common-ancestor of two classes */
-        std::string lca(std::string c1, std::string c2);
+        std::string lca(const std::string& c1, const std::string& c2);
 
-        SymbolTable *intersection(SymbolTable *a, SymbolTable *b);
+        Environment *intersection(Environment *a, Environment *b);
 
-        void merge(SymbolTable *a);
+        void merge(Environment *a);
     };
 }
 

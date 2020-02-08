@@ -5,7 +5,7 @@
 
 
 #include "all.hpp"
-#include "symtable.hpp"
+#include "environment.hpp"
 
 namespace ast {
     class Stack; /* forward reference */

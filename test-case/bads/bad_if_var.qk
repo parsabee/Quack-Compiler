@@ -1,0 +1,6 @@
+if (true) {
+    x: Int = 10;
+} else {
+    y: Int = 10;
+}
+x.PRINT();

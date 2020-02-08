@@ -1,0 +1,3 @@
+x: Obj = Obj();
+x = 10;
+x = "some string";

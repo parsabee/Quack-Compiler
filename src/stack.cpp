@@ -3,45 +3,33 @@
 #include <utility>
 
 namespace ast {
-    Stack::Stack(Classes *classes) : _classes{classes}, _size{0} {
+    Stack::Stack() {
         /* adding builtin types */
-        auto *builtins = new SymbolTable("___builtins___");
-
-        _classes->append(Obj_class());
-        builtins->add_symbol("Obj", "Obj", TYPE);
-
-        _classes->append(String_class());
-        builtins->add_symbol("String", "String", TYPE);
-
-        _classes->append(Integer_class());
-        builtins->add_symbol("Int", "Int", TYPE);
-
-        _classes->append(Nothing_class());
-        builtins->add_symbol("Nothing", "Nothing", TYPE);
-
-        _classes->append(Boolean_class());
-        builtins->add_symbol("Boolean", "Boolean", TYPE);
-
-        _stack.push_back(builtins);
+        _types = {
+            {"Obj", Obj_class()},
+            {"String", String_class()},
+            {"Int", Integer_class()},
+            {"Nothing", Nothing_class()},
+            {"Boolean", Boolean_class()}
+        };
+        _size = 0;
     }
 
     Stack::~Stack() {
         clear();
-        delete _stack.back();
     }
 
-    void Stack::push(SymbolTable *st) {
-        if (st->get_name() != "___builtins___") {
-            _stack.push_back(st);
-            _size++;
-        } else {
-            std::cerr << "___builtins___ is a reserved word\n";
+    void Stack::push(Environment *st) {
+        if (_size && st->get_name() == GLOBAL) {
+            std::cerr << "global scope being pushed twice!\n";
             assert(false);
         }
+        _stack.push_back(st);
+        _size++;
     }
 
-    SymbolTable *Stack::pop() {
-        SymbolTable *p = nullptr;
+    Environment *Stack::pop() {
+        Environment *p = nullptr;
         if (_size) {
             p = _stack.back();
             _stack.pop_back();
@@ -53,8 +41,8 @@ namespace ast {
         return p;
     }
 
-    SymbolTable *Stack::top() {
-        SymbolTable *p = nullptr;
+    Environment *Stack::top() {
+        Environment *p = nullptr;
         if (_size) {
             p = _stack.back();
         } else {
@@ -74,47 +62,40 @@ namespace ast {
             if ((*it)->has_symbol(sym))
                 return (*it)->get_symbol(sym);
         }
-        throw SymbolNotFound(sym);
+        throw SymbolNotFound(sym, nullptr);
     }
 
     bool Stack::has_type(const std::string& sym) {
-        for (auto i : _stack) {
-            if (i->has_type(sym))
-                return true;
-        }
-        return false;
+        return _types.count(sym) > 0;
     }
 
-    bool Stack::has_symbol(const std::string& sym) {
-        for (auto i : _stack) {
-            if (i->has_symbol(sym))
-                return true;
+    void Stack::add_type(const std::string& type, Class *cls) {
+        if (_types.count(type) > 0 ) {
+            throw TypeRedefinition(type, nullptr);
         }
-        return false;
+        _types.insert({type, cls});
     }
 
     Class *Stack::get_class(const std::string& name) {
-        for (auto i : _classes->get_elements()) {
-            if (i->get_name() == name)
-                return i;
-        }
-        return nullptr;
+        if (_types.count(name) > 0)
+            return _types[name];
+        throw TypeNotFound(name, nullptr);
     }
 
-    std::string Stack::lca(std::string c1, std::string c2) {
+    std::string Stack::lca(const std::string& c1, const std::string& c2) {
         if (c1 == c2)
-            return c1;
+            return std::string(c1);
         Class *C1 = get_class(c1);
         Class *C2 = get_class(c2);
         std::vector<std::string> c1_ancestors;
         std::string super = C1->get_super();
-        while (super != "Obj") {
+        while (!super.empty()) {
             c1_ancestors.push_back(super);
             super = get_class(super)->get_super();
         }
         std::vector<std::string> c2_ancestors;
         super = C2->get_super();
-        while (super != "Obj") {
+        while (!super.empty()) {
             c2_ancestors.push_back(super);
             super = get_class(super)->get_super();
         }
@@ -127,8 +108,8 @@ namespace ast {
         return "Obj";
     }
 
-    SymbolTable *Stack::intersection(SymbolTable *a, SymbolTable *b) {
-        auto *tmp = new SymbolTable("intersection");
+    Environment *Stack::intersection(Environment *a, Environment *b) {
+        auto *tmp = new Environment("intersection");
         for (const auto& i : a->table) {
             for (const auto& j : b->table) {
                 if (i.first == j.first) {
@@ -142,7 +123,7 @@ namespace ast {
         return tmp;
     }
 
-    void Stack::merge(SymbolTable *a) {
+    void Stack::merge(Environment *a) {
         if (!_size) {
             std::cerr << "merge called on empty stack\n";
             assert(false);
@@ -153,17 +134,26 @@ namespace ast {
     }
 
     void Stack::update_symbol(const std::string &sym, const std::string &type, int is_static) {
+        if (is_reserved(sym))
+            throw ReservedWord(sym, nullptr);
+
         std::string new_type;
         if (top()->has_symbol(sym)) {
-            if (top()->get_symbol(sym).second == STATIC) {
-                throw TypeError("redefining symbol with static type");
+            auto p = top()->get_symbol(sym);
+            if (p.second == STATIC && !type_match(p.first, type, *this)) {
+                throw TypeError("redefining symbol with static type", nullptr);
             }
-            auto old_type = top()->get_symbol(sym).first;
+            auto old_type = p.first;
             new_type = lca(old_type, type);
             top()->update_symbol(sym, new_type);
         } else {
             new_type = type;
             top()->add_symbol(sym, type, is_static);
         }
+    }
+
+    void Stack::assert_has_type(const std::string &sym) {
+        if (_types.count(sym) == 0)
+            throw TypeNotFound(sym, nullptr);
     }
 }

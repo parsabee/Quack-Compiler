@@ -3,10 +3,6 @@
 
 #include <utility>
 
-
-#include <utility>
-
-
 #include "all.hpp"
 #include "contexts.hpp"
 #include "stack.hpp"
@@ -18,13 +14,26 @@
  */
 #define UNUSED __attribute__((unused))
 
+/* the environment that contains builtin types
+ * sits at the bottom of environment stack */
+#define BUILTIN "___builtin___"
+
+/* global environment, every symbol in the global scope is stored here
+ * sits on top of built-in environment,
+ * every new (user-defined) scope will sit on top of this */
+#define GLOBAL "___global___"
+
 /*
  * error reporting facility
  */
-#define ERROR(OBJ) {                                                        \
-  std::stringstream msg;                                                    \
-  msg << "line " << (OBJ)->get_line() << ":    " << (OBJ)->get_signature(); \
-  report::error(ex.what(), msg.str());                                      \
+#define ERROR(OBJ) {\
+  std::stringstream msg;\
+  if (ex.get_node() != nullptr) {\
+      msg << "line " << ex.get_node()->get_line() << ":    " << ex.get_node()->get_signature();\
+  } else {\
+      msg << "line " << (OBJ)->get_line() << ":    " << (OBJ)->get_signature();\
+  }\
+  report::error(ex.what(), msg.str());\
 }
 
 /*
@@ -54,17 +63,20 @@ namespace ast {
  * check whether a word is reserved
  */
     bool is_reserved(const std::string& str);
+/*
+ * helper function to determine if t1 matches t2:
+ *
+ * they match if t1 == t2
+ * if t1 > t2:
+ *    meaning if t2 is a subclass of t1
+ */
+    bool
+    type_match (const std::string &t1, const std::string &t2, Stack &st);
 
 /* forward reference */
-    class ClassChecker;
-
-    class AssignChecker;
 
     class Classes;
-
     class Stack;
-
-    extern Classes *classes;
 
 /* all of the node types */
     enum nodes {
@@ -299,9 +311,9 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void semantic_check(Stack &st) override {}
+        void semantic_check(Stack &st) override;
 
-        void code_gen(CodegenContext &ctx, Stack &st) override {}
+        void code_gen(CodegenContext &ctx, Stack &st) override;
 
         ~Formal() override {
             delete _var;
@@ -325,6 +337,20 @@ namespace ast {
             }
             return sig;
         }
+
+        bool operator == (Formals const &other) {
+            if (_elements.size() != other.get_elements().size())
+                return false;
+            for (int i = 0; i < _elements.size(); i++) {
+                if (_elements[i]->get_type() != other.get_elements()[i]->get_type())
+                    return false;
+            }
+            return true;
+        }
+
+        bool operator != (Formals const &other) {
+            return !(*this == other);
+        }
     };
 
     class Method : public ASTNode {
@@ -336,7 +362,6 @@ namespace ast {
         Block *_statements;
         std::string _owner;
         bool _overriden; /* is method an override?, will be set _input_file typechecking stage */
-        bool _has_return; /* let the code generator know if there is't a return, take appropriate action */
         int _line_no;
     public:
         explicit Method(Ident *name, Formals *formals,
@@ -351,16 +376,6 @@ namespace ast {
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
         std::string get_signature() override;
-
-        bool
-        isOverriden() {
-            return _overriden;
-        }
-
-        void
-        setOverride(bool x) {
-            _overriden = x;
-        }
 
         std::string
         get_owner() {
@@ -412,6 +427,7 @@ namespace ast {
     class Methods : public Seq<Method> {
     public:
         explicit Methods(int line_no) : Seq("Methods", line_no) {}
+        void semantic_check(Stack &st) override ;
     };
 
     class Statement : public ASTNode {
@@ -482,8 +498,6 @@ namespace ast {
         void json(std::ostream &out, PrintContext &ctx) override;
 
         void semantic_check(Stack &st) override;
-
-        void code_gen(CodegenContext &ctx, Stack &st) override;
 
         std::string get_signature() override {
             std::string sig;
@@ -666,17 +680,13 @@ namespace ast {
         Ident *_super;
         Method *_constructor;
         Methods *_methods;
-        /* attributes of class,
-         * a name => type mapping */
-        std::unordered_map<std::string, std::string> *_attributes;
         std::unordered_map<std::string, std::pair<std::string, kinds>> *_attrs;
         bool _builtin;
         int _line_no;
     public:
         Class(Ident *name, Ident *super, Method *constuctor, Methods *methods, int line_no, bool builtin = false) :
                 _name{name}, _super{super}, _constructor{constuctor}, _methods{methods},
-                _attributes{new std::unordered_map<std::string, std::string>},
-                _attrs{new std::unordered_map<std::string, std::pair<std::string, attr_type>>},_builtin{builtin},
+                _attrs{new std::unordered_map<std::string, std::pair<std::string, kinds>>},_builtin{builtin},
                 _line_no{line_no} {}
 
         void json(std::ostream &out, PrintContext &ctx) override;
@@ -685,11 +695,18 @@ namespace ast {
 
         void code_gen(CodegenContext &ctx, Stack &st) override;
 
-        void add_attr(const std::string& name, const std::string& type);
+        bool has_attr(const std::string& attr) {
+            return _attrs->count(attr) != 0;
+        }
 
-        bool has_attr(const std::string& attr);
-
-        bool has_ancestor(const std::string& ancestor, Stack &st);
+        bool has_method(const std::string& name) {
+            for (auto &it: _methods->get_elements()) {
+                if (it->get_name() == name) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         int
         get_line() override {
@@ -711,9 +728,9 @@ namespace ast {
             return _constructor;
         }
 
-        std::unordered_map<std::string, std::string> *
-        get_attributes() const {
-            return _attributes;
+        std::unordered_map<std::string, std::pair<std::string, kinds>> *
+        get_attrs() const {
+            return _attrs;
         }
 
         Method *
@@ -721,7 +738,7 @@ namespace ast {
             for (auto i: _methods->get_elements())
                 if (i->get_name() == method)
                     return i;
-            return nullptr;
+            throw MethodNotFound(method, nullptr);
         }
 
         Methods *
@@ -732,11 +749,6 @@ namespace ast {
         bool
         is_builtin() {
             return _builtin;
-        }
-
-        auto
-        get_attrs() const {
-            return _attributes;
         }
 
         int
@@ -761,7 +773,6 @@ namespace ast {
             delete _super;
             delete _constructor;
             delete _methods;
-            delete _attributes;
             delete _attrs;
         }
 
@@ -1196,18 +1207,9 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void semantic_check(Stack &st) override {
-            std::cerr << "Program: nothing to be typechecked\n";
-            assert(false);
-        }
+        void semantic_check(Stack &st) override;
 
-        /* this is the one actually used, stack is generated here */
-        void code_gen(CodegenContext &ctx);
-
-        void code_gen(CodegenContext &ctx, Stack &st) override {
-            std::cerr << "Program: wrong codegen invoked\n";
-            assert(false);
-        }
+        void code_gen(CodegenContext &ctx, Stack &st) override;
 
         std::string get_signature() override {
             std::cerr << "Program: no signature";

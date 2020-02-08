@@ -11,7 +11,7 @@
     ast::ASTNode *root = nullptr; /* root of AST */
     void yyerror(const char *msg) {
       report::num_errors++;
-      fprintf(stderr, "%d: %s\n\n", yylloc.first_line, msg);
+      fprintf(stderr, "SyntaxError\nline %d: %s\n\n", yylloc.first_line, msg);
     }
     int yylex_destroy();
 }

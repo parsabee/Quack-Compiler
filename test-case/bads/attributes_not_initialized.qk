@@ -1,0 +1,7 @@
+class A(a: Int) {
+    this.a = a;
+}
+
+class B(b: Int) extends A {
+    this.b = b;
+}

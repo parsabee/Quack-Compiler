@@ -1,0 +1,4 @@
+a: Int = 1;
+if (a) {
+    "bad\n".PRINT();
+}

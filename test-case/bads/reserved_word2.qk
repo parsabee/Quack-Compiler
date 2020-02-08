@@ -1,0 +1,3 @@
+class A() {
+    def ___builtin___() {}
+}

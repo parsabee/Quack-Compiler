@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
             {nullptr,   0,                 nullptr, 0  }
     };
 
-    int json = 0;
+    int json = 0, status = 1;
     char *output_file = nullptr;
 
     int ch;
@@ -65,12 +65,12 @@ int main(int argc, char *argv[]) {
     try {
         ast::Driver drv(argv[0], output_file);
         if (json)
-            ast::Driver::json();
+            status = drv.json();
         else
-            drv.compile();
+            status = drv.compile();
     } catch (const std::exception &ex) {
         std::cerr << ex.what() << '\n';
         exit(1);
     }
-    exit(0);
+    exit(status);
 }

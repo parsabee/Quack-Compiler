@@ -21,41 +21,16 @@ extern int yyparse();
 namespace ast {
 
     class Driver {
-        class TypeChecker {
-            Stack& _st;
-            Program *_pgm;
-
-        public:
-            TypeChecker(Program *pgm, Stack& st)
-                    : _pgm(pgm), _st(st) {}
-
-            void type_check();
-        };
-
-        class CodeGenerator {
-            Stack& _st;
-            Program *_pgm;
-            std::ostream &_out;
-
-        public:
-            CodeGenerator(Program *pgm, std::ostream &out, Stack& st)
-                    : _pgm(pgm), _out(out), _st(st) {}
-
-            void code_gen();
-        };
-
         const char *_input_file, *_output_file;
         FILE *_file;
         std::ofstream _out;
     public:
         explicit Driver(const char *input_file, const char *output_file = nullptr);
-        void compile();
-        static void json();
-        static bool assert_file_type(const char *file, const char *ext);
+        int compile(); /* returns exit status (1: error, 0: success) */
+        int json();
+        bool compare_file_type(const char *file, const char *ext);
         ~Driver() {
             if (_file) fclose(_file);
         }
     };
-
-
 }

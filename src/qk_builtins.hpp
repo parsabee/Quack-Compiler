@@ -3,7 +3,7 @@
 
 #include "all.hpp"
 #include "ast_node.hpp"
-#include "symtable.hpp"
+#include "environment.hpp"
 
 namespace ast {
     class Class; /* forward reference */

@@ -1,12 +1,6 @@
 #include "ast_node.hpp"
 
 #include <utility>
-#include "helper_assign.hpp"
-#include "helper_method.hpp"
-#include "helper_class.hpp"
-
-#define GLOBAL "___global___"
-#define BUILTIN "___builtin___"
 
 namespace ast {
 
@@ -43,6 +37,29 @@ namespace ast {
                 forward_ref(ctx, st, tmp->getBody(), "while");
             }
         }
+    }
+
+
+/*
+ * helper function to determine if t1 matches t2:
+ *
+ * they match if t1 == t2
+ * if t1 > t2:
+ *    meaning if t2 is a subclass of t1
+ */
+    bool
+    type_match (const std::string &t1, const std::string &t2, Stack &st) {
+        if (t1 == t2)
+            return true;
+        auto clss = st.get_class(t2); /* might throw error */
+        auto super = clss->get_super();
+        while (!super.empty()) {
+            clss = st.get_class(super);
+            if (super == t1)
+                return true;
+            super = clss->get_super();
+        }
+        return false;
     }
 
 /* Indent to a given level */
@@ -84,59 +101,74 @@ namespace ast {
         json_close(out, ctx);
     }
 
-    void
-    Program::code_gen(CodegenContext &ctx) {
-        Stack st(_classes);
 
-        /* Type Checking */
-
-        auto *global = new SymbolTable(GLOBAL);
-        st.push(global);
+    void Program::semantic_check(Stack &st) {
         try {
-            /* adding every type to the global environment */
-            for (auto i : _classes->get_elements())
-                global->add_symbol(i->get_name(), i->get_name(), TYPE);
-
+            st.push (new Environment(GLOBAL)); /* the program starts in the global scope */
             _classes->semantic_check(st);
             _statements->semantic_check(st);
+            delete st.pop();
+        } catch (const ast_exception &ex) {
+            std::cerr << ex.what() <<  "\n";
         }
-        catch (const DuplicateSymbol &ex) {
-            report::error(ex.what());
-        }
+    }
+
+    void
+    Program::code_gen(CodegenContext &ctx, Stack &st) {
+
+        /* preamble */
+        ctx.emit( "/*\n"
+                  " * MIT License\n"
+                  " *\n"
+                  " * Copyright (c) 2020 Parsa Bagheri\n"
+                  " *\n"
+                  " * Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+                  " * of this software and associated documentation files (the \"Software\"), to deal\n"
+                  " * _input_file the Software without restriction, including without limitation the rights\n"
+                  " * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+                  " * copies of the Software, and to permit persons to whom the Software is\n"
+                  " * furnished to do so, subject to the following conditions:\n"
+                  " *\n"
+                  " * The above copyright notice and this permission notice shall be included _input_file all\n"
+                  " * copies or substantial portions of the Software.\n"
+                  " *\n"
+                  " * THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+                  " * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+                  " * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+                  " * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+                  " * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+                  " * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+                  " * SOFTWARE.\n"
+                  " */\n\n");
 
         /* Code Generation */
-        st.clear();
-        if (report::num_errors == 0) {
-            global = new SymbolTable(GLOBAL);
-            ctx.emit("#include <stdlib.h>\n");
-            ctx.emit("#include \"builtins.h\"\n\n"); /* preamble */
-            if (_classes->len() > 5) /* 5 builtin classes */
-                ctx.emit("/* ======================= Class Declerations ======================= */\n\n");
+        ctx.emit("#include <stdlib.h>\n");
+        ctx.emit("#include \"builtins.h\"\n\n"); /* preamble */
+        if (_classes->len() > 5) /* 5 builtin classes */
+            ctx.emit("/* ======================= Class Declerations ======================= */\n\n");
 
-            auto the_classes = _classes->get_elements();
-            for (Class *cls: the_classes) {
-                if (!cls->is_builtin()) {
-                    std::string class_name = cls->get_name();
-                    ctx.emit_class_sig(class_name); /* outputting forward references to our classes */
-                    global->add_symbol(class_name, class_name, TYPE);
-                }
+        auto *global = new Environment(GLOBAL);
+        for (Class *cls: _classes->get_elements()) {
+            if (!cls->is_builtin()) {
+                std::string class_name = cls->get_name();
+                ctx.emit_class_sig(class_name); /* outputting forward references to our classes */
+                global->add_symbol(class_name, class_name, TYPE);
             }
-            st.push(global);
-            if (_classes->len() > 5) /* 5 builtin classes */
-                ctx.emit("/* ======================= Class Definitions ======================== */\n\n");
+        }
+        st.push(global);
+        if (_classes->len() > 5) /* 5 builtin classes */
+            ctx.emit("/* ======================= Class Definitions ======================== */\n\n");
 
-            _classes->code_gen(ctx, st);
-            ctx.emit(    "/* ============================== Main ============================== */\n\n");
-            ctx.emit("int main (int argc, char *argv[]) {\n");
-            ctx.indent();
-            _statements->semantic_check(st); /* do this to fill the symbol table */
-            _statements->code_gen(ctx, st);
-            ctx.emit("exit(0);\n");
-            ctx.dedent();
-            ctx.emit("}\n");
-            delete st.pop();
-        } else
-            delete this;
+        _classes->code_gen(ctx, st);
+
+        ctx.emit(    "/* ============================== Main ============================== */\n\n");
+        ctx.emit("int main (int argc, char *argv[]) {\n");
+        ctx.indent();
+        _statements->code_gen(ctx, st);
+        ctx.emit("exit(0);\n");
+        ctx.dedent();
+        ctx.emit("}\n");
+        delete st.pop();
     }
 
     void
@@ -145,6 +177,14 @@ namespace ast {
         json_child("var_", _var, out, ctx);
         json_child("type_", _type, out, ctx, ' ');
         json_close(out, ctx);
+    }
+
+    void Formal::semantic_check(Stack &st) {
+        st.assert_has_type(_type->get_text());
+    }
+
+    void Formal::code_gen(CodegenContext &ctx, Stack &st) {
+
     }
 
     void
@@ -156,12 +196,11 @@ namespace ast {
          * symbol table,
          * otherwise, type not found.
          * =============================================== */
-        SymbolTable *symtable = st.top();
+        Environment *symtable = st.top();
         for (auto formal: get_elements()) {
             /* Adding each formal to symbol table */
             std::string formal_type = formal->get_type()->get_text();
-            if (!st.has_type(formal_type))
-                throw TypeNotFound(formal_type);
+            formal->semantic_check(st);
             symtable->add_symbol(formal->get_var()->get_text(), formal_type, NON_STATIC);
         }
     }
@@ -174,7 +213,7 @@ namespace ast {
          * ================================= */
 
         std::stringstream ss;
-        ss << get_name() << " (";
+        ss << "def " << get_name() << " (";
         bool first = true;
         for (auto i: _formals->get_elements()) {
             /* i is Formal * */
@@ -200,9 +239,38 @@ namespace ast {
 
     void
     Method::semantic_check(Stack &st) {
+        /* =============================================
+         * def <method_name>(<formals>): <return_type> {
+         *   <statements>
+         * }
+         *
+         * semantics of method:
+         * the return statement in a method has to
+         * match its return type
+         * push a new environment to the stack and
+         * add formals to it
+         * semantic check the statements
+         * ============================================ */
         try {
-            auto mc = MethodChecker(this, st);
-            mc.type_check();
+            if (is_reserved(get_name())) {
+                throw ReservedWord(get_name(), this);
+            }
+            st.assert_has_type(_returns->get_text());
+            _formals->semantic_check(st);
+            /* checking if it returns anything */
+            bool found_return = false;
+            for (auto &it: _statements->get_elements()) {
+                if (it->type() == RETURN) {
+                    found_return = true;
+                }
+                it->semantic_check(st);
+            }
+            /* if no return statement found, then method either has to be the constructor
+             * or it has to return Nothing type */
+            if (!found_return && _returns->get_text() != "Nothing"
+                  && !st.has_type(st.top()->get_name())) {
+                throw TypeError("method doesn't return anything", this);
+            }
         } catch (const ast_exception &ex) {
             ERROR(this);
         }
@@ -212,7 +280,7 @@ namespace ast {
     Method::code_gen(CodegenContext &ctx, Stack &st) {
 
         std::string str = st.top()->get_name();
-        auto symtable = new SymbolTable(str + ":" + _name->get_text());
+        auto symtable = new Environment(str + ":" + _name->get_text());
         st.push(symtable);
         std::string method_name = _owner + "_method_" + _name->get_text();
         std::string return_type = _returns->get_text();
@@ -230,13 +298,24 @@ namespace ast {
         ctx.emit("obj_" + return_type + " " + method_name + ss.str() + " {\n");
         ctx.indent();
         _statements->code_gen(ctx, st);
-        if (!_has_return) {
+        if (_returns->get_text() == "Nothing") {
             ctx.emit("return none;\n");
         }
         ctx.dedent();
         ctx.emit("}\n\n");
         delete st.pop();
         ctx.resetReg();
+    }
+
+
+    void Methods::semantic_check(Stack &st) {
+        for (auto &it: _elements) {
+            /* the new scope is called * <cur_scope>:<method_name> */
+            std::string environ = st.top()->get_name() + ":" + it->get_name();
+            st.push(new Environment(environ));
+            it->semantic_check(st);
+            delete st.pop();
+        }
     }
 
     void
@@ -280,10 +359,25 @@ namespace ast {
 
     void
     Assign::code_gen(CodegenContext &ctx, Stack &st) {
-        /* generating code for left side */
 
-        auto ag = AssignGenerator(this, ctx, st);
-        ag.code_gen();
+        semantic_check(st);
+        std::string var_type = _lexpr->type_check(st);
+        _rexpr->code_gen(ctx, st);
+        std::string right_tmp = ctx.get_last_temp();
+        auto ident = dynamic_cast<Ident *>(_lexpr);
+        if (ident) {
+            ctx.declare_variable(ident->type_check(st), ident->get_text(), st);
+            std::string str = ast::CodegenContext::gen_variable(ident->get_text());
+            str += " = (obj_" + var_type + ")" + right_tmp + ";\n";
+            ctx.emit(str);
+        } else {
+            auto dot = dynamic_cast<Dot *>(_lexpr);
+            assert(dot);
+            dot->get_left()->code_gen(ctx, st);
+            std::string str = ctx.get_last_temp() + "->" + dot->get_right()->get_text()
+                              + " = (obj_" + var_type + ")" + right_tmp + ";\n";
+            ctx.emit(str);
+        }
     }
 
     void
@@ -307,27 +401,27 @@ namespace ast {
          * =============================================== */
         try {
             std::string rhs_type = _rexpr->type_check(st);
+            std::string static_type = _static_type->get_text();
+            st.assert_has_type(static_type); /* throws error if type not found */
+            if (!type_match(static_type, rhs_type, st)) {
+                throw TypeError("static type doesn't match rvalue's type", this);
+            }
             auto dot = dynamic_cast<Dot *>(_lexpr);
             if (dot) {
                 auto receiver = dot->get_left()->type_check(st);
                 auto clss = st.get_class(receiver);
-                clss->update_attribute(dot->get_right()->get_text(), rhs_type, STATIC, st);
+                clss->update_attribute(dot->get_right()->get_text(), static_type, STATIC, st);
             } else {
                 auto ident = dynamic_cast<Ident *>(_lexpr);
                 assert(ident != nullptr);
-                st.update_symbol(ident->get_text(), rhs_type, STATIC);
+                if (st.top()->has_symbol(ident->get_text())) {
+                    throw DuplicateSymbol( "symbol " + ident->get_text() + " is already defined" , this);
+                }
+                st.update_symbol(ident->get_text(), static_type, STATIC);
             }
         } catch (const ast_exception &ex) {
             ERROR(this);
         }
-    }
-
-    void
-    AssignDeclare::code_gen(CodegenContext &ctx, Stack &st) {
-        /* generating code for left side */
-
-        auto ag = AssignGenerator(this, ctx, st);
-        ag.code_gen();
     }
 
     void
@@ -341,34 +435,17 @@ namespace ast {
     Return::code_gen(CodegenContext &ctx, Stack &st) {
         _expr->code_gen(ctx, st);
         std::string str = st.top()->get_name();
-        std::string the_class = str.substr(0, str.find(':'));
-        std::string the_method = str.substr(str.find(':') + 1, str.length());
+        
+        int colon = str.find(':');
+        std::string the_class = str.substr(0, colon);
+        std::string the_method;
+        if (colon != std::string::npos)
+            the_method = str.substr(colon + 1);
+
         Class *c = st.get_class(the_class);
         Method *m = c->get_method(the_method);
         std::string type = m->get_return();
         ctx.emit("return (obj_" + type + ")" + ctx.get_last_temp() + ";\n");
-    }
-
-    static bool
-    type_match (const std::string &t1, const std::string &t2, Stack &st) {
-        /* ===============================================
-         * helper function to determine if t1 matches t2:
-         *
-         * they match if t1 == t2
-         * if t1 > t2:
-         *    meaning if t2 is a subclass of t1
-         * =============================================== */
-        if (t1 == t2)
-            return true;
-        auto clss = st.get_class(t2); /* might throw error */
-        auto super = clss->get_super();
-        while (!super.empty()) {
-            clss = st.get_class(super);
-            super = clss->get_super();
-            if (super == t1)
-                return true;
-        }
-        return false;
     }
 
     void
@@ -383,20 +460,23 @@ namespace ast {
          * =============================================== */
         try {
             auto environ = st.top()->get_name();
-            auto type = environ.substr(0, environ.find(':'));
-            auto method = environ.substr(environ.find(':') + 1, environ.length());
+            int colon = environ.find(':');
+            std::string type, method;
+            if (colon != std::string::npos)
+                method = environ.substr(colon + 1);
+            type = environ.substr(0, colon);
 
             if (type == GLOBAL) {
-                throw TypeError("return found in the global scope");
+                throw TypeError("return found in the global scope", this);
             } if (method.empty()) {
-                throw TypeError("return not being used inside a method");
+                throw TypeError("return not being used inside a method", this);
             }
 
             auto clss = st.get_class(type);
             for (auto m : clss->get_methods()->get_elements()) {
                 if (m->get_name() == method) {
                     if (!type_match(m->get_return(),_expr->type_check(st), st)) {
-                        throw TypeError("mismatch between method return type and its return statement");
+                        throw TypeError("mismatch between method's return type and its return statement", m);
                     }
                     break;
                 }
@@ -434,18 +514,18 @@ namespace ast {
 
         try {
             if (_cond->type_check(st) != "Boolean")
-                throw TypeError("if statements condition isn't Boolean");
-            auto true_table = new SymbolTable(st.top()->get_name());
+                throw TypeError("if statements condition isn't Boolean", this);
+            auto true_table = new Environment(st.top()->get_name());
             st.push(true_table);
             _true_part->semantic_check(st);
             (void) st.pop();
-            auto false_table = new SymbolTable(st.top()->get_name());
+            auto false_table = new Environment(st.top()->get_name());
             st.push(false_table);
             _false_part->semantic_check(st);
             (void) st.pop();
 
             /* collecting symbols defined _input_file both true and false branches */
-            SymbolTable *ture_false_intersection = st.intersection(true_table, false_table);
+            Environment *ture_false_intersection = st.intersection(true_table, false_table);
             /* merging intersection with the top-most symbol table */
             st.merge(ture_false_intersection);
 
@@ -516,9 +596,9 @@ namespace ast {
 
         try {
             if (_cond->type_check(st) != "Boolean")
-                throw TypeError("while loops condition isn't Boolean");
+                throw TypeError("while loops condition isn't Boolean", this);
 
-            st.push(new SymbolTable(st.top()->get_name()));
+            st.push(new Environment(st.top()->get_name()));
             _body->semantic_check(st);
             delete st.pop();
         } catch (const ast_exception &ex) {
@@ -609,11 +689,13 @@ namespace ast {
         } else if (_text == "this") {
             auto environ = st.top()->get_name();
             if (environ == GLOBAL)
-                throw TypeError("usage of `this' outside of a class");
+                throw TypeError("usage of `this' outside of a class", this);
             auto type = environ.substr(0, environ.find(':'));
             return type;
         } else {
             auto t = st.get_symbol(_text); /* SymbolNotFound may be thrown */
+            if (t.second == TYPE)
+                throw DuplicateSymbol("a class with this name is already declared", this);
             return t.first;
         }
     }
@@ -654,9 +736,9 @@ namespace ast {
         } else if (_text == "true" || _text == "false") {
             std::string lit = _text == "true" ? "lit_true" : "lit_false";
             ctx.emit("obj_Boolean " + tmp + " = " + lit + ";\n");
-        } else if (_text == "none")
+        } else if (_text == "none") {
             ctx.emit("obj_Nothing " + tmp + " = none;\n");
-        else {
+        } else {
             try {
                 std::string type = st.get_symbol(_text).first;
                 ctx.declare_variable(type, _text, st);
@@ -669,7 +751,13 @@ namespace ast {
 
     void
     Classes::semantic_check(Stack &st) {
-        for (auto el: _elements) {
+        for (auto &el: _elements) {
+            if (!el->is_builtin()) {
+                st.add_type(el->get_name(), el);
+                st.top()->add_symbol(el->get_name(), el->get_name(), TYPE);
+            }
+        }
+        for (auto &el: _elements) {
             if (!el->is_builtin())
                 el->semantic_check(st);
         }
@@ -677,41 +765,10 @@ namespace ast {
 
     void
     Classes::code_gen(CodegenContext &ctx, Stack &st) {
-        for (auto el: _elements) {
+        for (auto &el: _elements) {
             if (!el->is_builtin())
                 el->code_gen(ctx, st);
         }
-    }
-
-    void
-    Class::add_attr(const std::string& name, const std::string& type) {
-        if (_attributes->count(name) == 0)
-            _attributes->insert({name, type});
-        else
-            throw DuplicateSymbol(name);
-    }
-
-    bool
-    Class::has_attr(const std::string& attr) {
-        return _attributes->count(attr) != 0;
-    }
-
-    bool
-    Class::has_ancestor(const std::string& ancestor, Stack &st) {
-        std::string obj_str = "Obj";
-        /* every class has Obj as ancestor */
-        if (ancestor == obj_str)
-            return true;
-        /* going up the class hierarchy */
-        std::string super_str = get_super();
-        while (super_str != obj_str) {
-            if (ancestor == super_str)
-                return true;
-
-            Class *super = st.get_class(super_str);
-            super_str = super->get_super();
-        }
-        return false;
     }
 
     void
@@ -726,9 +783,70 @@ namespace ast {
 
     void
     Class::semantic_check(Stack &st) {
+        /* ============================================
+         * class <name>(<formals>) extends <parent> {
+         *   <constructor>
+         *   <methods>
+         * }
+         *
+         * semantics of Class:
+         * this is probably the most complicated element
+         * of Quack
+         * we need to check for
+         * 1) circular dependency
+         * 2) parent attributes being initialized
+         * 3) checking for overloads(not allowed)
+         * ============================================ */
         try {
-            auto cc = ClassChecker(this, st);
-            cc.type_check();
+
+            /* checking for valid inheritance */
+            auto parent = st.get_class(get_super());
+
+            /* circular inheritance */
+            std::string tmp = parent->get_name();
+            while (tmp != "Obj") {
+                if (get_name() == tmp) {
+                    throw BadInherit("circular inheritance", this);
+                }
+                tmp = st.get_class(tmp)->get_super();
+            }
+
+            /* semantic checking the constructor */
+            st.push (new Environment(get_name()));
+            _constructor->semantic_check(st);
+            delete st.pop();
+
+            /* checking all attributes initialized */
+            for (auto &it: *(parent->get_attrs())) {
+                if (_attrs->count(it.first) == 0) {
+                    auto err = "uninitialized attribute " + it.first + ": " + it.second.first;
+                    throw AttributeError(err, this);
+                }
+            }
+
+            /* checking for overrides */
+            std::unordered_set<std::string> checked_methods;
+            for (auto &it: _methods->get_elements()) {
+                std::string name = it->get_name();
+                if (checked_methods.count(name) > 0)
+                    throw MethodOverload(name, it);
+                checked_methods.insert(name);
+                if (parent->has_method(name)) {
+                    /* found method, check if it's overloading */
+                    auto m = parent->get_method(name);
+                    if (*(m->get_formals()) != *(it->get_formals()) || m->get_return() != it->get_return()) {
+                        auto err = "method `" + name + "'s signature doesn't match the method it overrides";
+                        throw TypeError(err, it);
+                    }
+                }
+            }
+
+            /* every method are within this class's namespace */
+            st.push (new Environment(get_name()));
+            _methods->semantic_check(st);
+            delete st.pop();
+
+
         } catch (const ast_exception &ex) {
             ERROR(this);
         }
@@ -736,8 +854,6 @@ namespace ast {
 
     void
     Class::code_gen(CodegenContext &ctx, Stack &st) {
-        auto cg = ClassGenerator(this, st, ctx);
-        cg.code_gen();
     }
 
     void Class::update_attribute(const std::string &attr,
@@ -752,10 +868,10 @@ namespace ast {
             _attrs->insert({attr, {type, kind}});
         } else {
             if (_attrs->at(attr).second == STATIC) {
-                throw TypeError("redefining symbol with static type");
+                throw TypeError("redefining symbol with static type", this);
             }
             if (kind == STATIC) {
-                throw TypeError("statically declaring an already defined symbol");
+                throw TypeError("statically declaring an already defined symbol", this);
             }
             std::string &old_type = _attrs->at(attr).first;
             std::string new_type = st.lca(old_type, type);
@@ -793,7 +909,7 @@ namespace ast {
         }
         if (calling_method)
             return calling_method;
-        throw MethodNotFound(_method->get_text());
+        throw MethodNotFound(_method->get_text(), this);
     }
 
     std::string
@@ -804,7 +920,7 @@ namespace ast {
         if (method)
             return method->get_return();
 
-        throw MethodNotFound(get_method_name());
+        throw MethodNotFound(get_method_name(), this);
     }
 
     void
@@ -821,7 +937,7 @@ namespace ast {
             _receiver->semantic_check(st);
             std::string receiver_type = _receiver->type_check(st);
             Method *calling_method = get_method(st);
-            MethodChecker::call_check(_actuals, calling_method, st);
+//            MethodChecker::call_check(_actuals, calling_method, st);
         }
         catch (const ast_exception &ex) {
             ERROR(this);
@@ -903,15 +1019,16 @@ namespace ast {
         std::string method = _method->get_text();
         if (st.has_type(method))
             return method;
-        throw TypeNotFound(method);
+        throw TypeNotFound(method, this);
     }
 
     void
     Construct::semantic_check(Stack &st) {
         try {
             std::string type = _method->get_text();
+            st.assert_has_type(type);
             Method *constructor = st.get_class(type)->get_constructor();
-            MethodChecker::call_check(_actuals, constructor, st);
+//            MethodChecker::call_check(_actuals, constructor, st);
         }
         catch (ast_exception &ex) {
             ERROR(this);
@@ -1021,9 +1138,9 @@ namespace ast {
         auto left_class = st.get_class(left_type);
         auto attr = _right->get_text();
         if (left_class->has_attr(attr))
-            return left_class->get_attrs()->at(attr);
+            return left_class->get_attrs()->at(attr).first;
         else
-            throw AttributeError(attr);
+            throw AttributeError(attr, this);
     }
 
     void
@@ -1064,13 +1181,12 @@ namespace ast {
         }
         Class *left_class = st.get_class(type);
         if (left_class) {
-            std::string attr_type = left_class->get_attrs()->at(_right->get_text());
+            std::string attr_type = left_class->get_attrs()->at(_right->get_text()).first;
             std::string dot_tmp = ctx.gen_temp();
             ctx.emit("obj_" + attr_type + " " + dot_tmp + " = (obj_" + attr_type + ")("
                      + left_tmp + "->" + _right->get_text() + ");\n");
         }
     }
-
 } /* namespace ast */
 
 

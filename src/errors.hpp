@@ -17,6 +17,9 @@ namespace io {
     };
 }
 namespace ast {
+
+    class ASTNode; /* forward reference */
+
     /*
      * base type for type errors
      */
@@ -26,118 +29,158 @@ namespace ast {
         const char *what() const noexcept override {
             return "ASTException";
         }
-    };
-
-    struct BadInit : public ast_exception {
-        BadInit() = default;
-
-        const char *what() const noexcept override {
-            return "BadInit";
+        virtual ASTNode *get_node() const noexcept {
+            return nullptr;
         }
     };
 
     struct BadInherit : public ast_exception {
-        explicit BadInherit(const std::string& note = "")
-                : error("BadInherit -- " + note){}
+        BadInherit(const std::string& note, ASTNode *obj)
+                : error("BadInherit -- " + note), obj(obj) {}
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
-    };
-
-    struct SyntaxError : public ast_exception {
-        SyntaxError() = default;
-
-        const char *what() const noexcept override {
-            return "SyntaxError";
-        }
-    };
-
-    struct NotParsed : public ast_exception {
-        NotParsed() = default;
-
-        const char *what() const noexcept override {
-            return "ASTNotParsed";
-        }
+        ASTNode *obj;
     };
 
     struct DuplicateSymbol : public ast_exception {
-        explicit DuplicateSymbol(const std::string& sym)
-            : error("DuplicateSymbol -- " + sym) {}
+        DuplicateSymbol(const std::string& sym, ASTNode *obj)
+            : error("DuplicateSymbol -- " + sym), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
     };
 
     struct SymbolNotFound : public ast_exception {
-        explicit SymbolNotFound(const std::string& sym)
-            : error("SymbolNotFound -- " + sym) {}
+        SymbolNotFound(const std::string& sym, ASTNode *obj)
+            : error("SymbolNotFound -- " + sym), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
+    };
+
+    struct MethodOverload : public ast_exception {
+        MethodOverload(const std::string& sym, ASTNode *obj)
+                : error("MethodOverload -- " + sym), obj(obj) {}
+
+        const char *what() const noexcept override {
+            return error.c_str();
+        }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
+    private:
+        std::string error;
+        ASTNode *obj;
     };
 
     struct MethodNotFound : public ast_exception {
 
-        explicit MethodNotFound(const std::string& sym)
-        : error("MethodNotFound -- " + sym) {}
+        MethodNotFound(const std::string& sym, ASTNode *obj)
+        : error("MethodNotFound -- " + sym), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
     };
 
     struct TypeNotFound : public ast_exception {
 
-        explicit TypeNotFound(const std::string& sym)
-            : error("TypeNotFound " + sym) {}
+        TypeNotFound(const std::string& sym, ASTNode *obj)
+            : error("TypeNotFound -- " + sym), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
+    };
+
+    struct TypeRedefinition : public ast_exception {
+        TypeRedefinition(const std::string& note, ASTNode *obj)
+                : error("TypeRedefinition -- " + note), obj(obj) {}
+        const char *what() const noexcept override {
+            return error.c_str();
+        }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
+    private:
+        std::string error;
+        ASTNode *obj;
     };
 
     struct TypeError : public ast_exception {
-        explicit TypeError(const std::string& note = "")
-            : error("TypeError -- " + note) {}
+        TypeError(const std::string& note, ASTNode *obj)
+            : error("TypeError -- " + note), obj(obj) {}
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
     };
 
     struct ReservedWord : public ast_exception {
-        explicit ReservedWord(const std::string& wrd)
-            : error("ReservedWord " + wrd) {}
+        ReservedWord(const std::string& wrd, ASTNode *obj)
+            : error("ReservedWord " + wrd), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
     };
 
     struct AttributeError : public ast_exception {
-        explicit AttributeError(const std::string& wrd)
-            : error("AttributeError " + wrd) {}
+        AttributeError(const std::string& wrd, ASTNode *obj)
+            : error("AttributeError " + wrd), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
         }
+        ASTNode *get_node() const noexcept override {
+            return obj;
+        }
     private:
         std::string error;
+        ASTNode *obj;
     };
 }
 #endif /*_ERROR_H_*/
