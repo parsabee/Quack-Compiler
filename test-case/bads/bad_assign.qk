@@ -1,0 +1,8 @@
+class A() {
+    def hello() : String {
+        return "hello";
+    }
+}
+
+a = A();
+h: Int = a.hello();

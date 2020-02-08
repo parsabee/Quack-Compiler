@@ -341,6 +341,7 @@ namespace ast {
          * of the two types.
          * =============================================== */
         try {
+            _rexpr->semantic_check(st);
             std::string rhs_type = _rexpr->type_check(st);
             auto dot = dynamic_cast<Dot *>(_lexpr);
             if (dot) {
@@ -400,6 +401,7 @@ namespace ast {
          * reassignments leads to symbol redefinition error
          * =============================================== */
         try {
+            _rexpr->semantic_check(st);
             std::string rhs_type = _rexpr->type_check(st);
             std::string static_type = _static_type->get_text();
             st.assert_has_type(static_type); /* throws error if type not found */
@@ -834,7 +836,8 @@ namespace ast {
                 if (parent->has_method(name)) {
                     /* found method, check if it's overloading */
                     auto m = parent->get_method(name);
-                    if (*(m->get_formals()) != *(it->get_formals()) || m->get_return() != it->get_return()) {
+                    if (*(m->get_formals()) != *(it->get_formals()) ||
+                        !type_match(m->get_return(), it->get_return(), st)) {
                         auto err = "method `" + name + "'s signature doesn't match the method it overrides";
                         throw TypeError(err, it);
                     }
@@ -937,7 +940,16 @@ namespace ast {
             _receiver->semantic_check(st);
             std::string receiver_type = _receiver->type_check(st);
             Method *calling_method = get_method(st);
-//            MethodChecker::call_check(_actuals, calling_method, st);
+            if (calling_method->get_formals()->get_elements().size()
+                != _actuals->get_elements().size()) {
+                throw TypeError("number of arguments passed don't match method's signature", this);
+            }
+            for (int i = 0; i < _actuals->get_elements().size(); i++) {
+                if (_actuals->get_elements()[i]->type_check(st) !=
+                    calling_method->get_formals()->get_elements()[i]->type_check(st)) {
+                    throw TypeError("type of arguments passed don't match method's signature", this);
+                }
+            }
         }
         catch (const ast_exception &ex) {
             ERROR(this);
@@ -979,7 +991,7 @@ namespace ast {
             std::string caller_tmp = ctx.gen_temp();
             _receiver->code_gen(ctx, st);
             ctx.emit("obj_" + receiver_type + " " + caller_tmp + " = " + ctx.get_last_temp() + ";\n");
-            ss << caller_tmp << "->clazz->" << _method->get_text() << "((obj_" << calling_method->get_owner()
+            ss << "(" << caller_tmp << "->clazz->" << _method->get_text() << "((obj_" << calling_method->get_owner()
                << ")" << caller_tmp;
 
             auto actuals_vector = _actuals->get_elements();
@@ -990,7 +1002,7 @@ namespace ast {
                 actuals_vector[i]->code_gen(ctx, st);
                 ss << ctx.get_last_temp();
             }
-            ss << ");\n";
+            ss << "));\n";
             ctx.emit(ss.str());
             ctx.emit("obj_" + calling_method->get_return()
                      + " " + ctx.gen_temp() + " = " + tmp + ";\n");
@@ -1027,8 +1039,17 @@ namespace ast {
         try {
             std::string type = _method->get_text();
             st.assert_has_type(type);
-            Method *constructor = st.get_class(type)->get_constructor();
-//            MethodChecker::call_check(_actuals, constructor, st);
+            auto *constructor = st.get_class(type)->get_constructor();
+            if (constructor->get_formals()->get_elements().size()
+                 != _actuals->get_elements().size()) {
+                throw TypeError("number of arguments passed don't match constructor's signature", this);
+            }
+            for (int i = 0; i < _actuals->get_elements().size(); i++) {
+                if (_actuals->get_elements()[i]->type_check(st) !=
+                constructor->get_formals()->get_elements()[i]->type_check(st)) {
+                    throw TypeError("type of arguments passed don't match constructor's signature", this);
+                }
+            }
         }
         catch (ast_exception &ex) {
             ERROR(this);
@@ -1137,10 +1158,15 @@ namespace ast {
         left_type = _left->type_check(st);
         auto left_class = st.get_class(left_type);
         auto attr = _right->get_text();
-        if (left_class->has_attr(attr))
-            return left_class->get_attrs()->at(attr).first;
-        else
+        if (!left_class->has_attr(attr))
             throw AttributeError(attr, this);
+        else {
+            auto scope = st.top()->get_name();
+            if (scope.substr(0, scope.find(':')) != left_type) {
+                throw AttributeError("accessing private member", this);
+            }
+            return left_class->get_attrs()->at(attr).first;
+        }
     }
 
     void

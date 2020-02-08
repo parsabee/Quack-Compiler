@@ -1,0 +1,6 @@
+class A(x: Int, y: Int) {
+    this.x = x;
+    this.y = y;
+}
+
+a = A(1, 2, 3);

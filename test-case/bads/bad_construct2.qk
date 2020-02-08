@@ -1,0 +1,5 @@
+class A(a: Int) {
+    this.a = a;
+}
+
+a = A(1);

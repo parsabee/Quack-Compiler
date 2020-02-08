@@ -1,0 +1,6 @@
+class A() {
+
+}
+
+a = A();
+a.a.PRINT();
