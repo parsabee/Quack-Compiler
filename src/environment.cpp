@@ -1,7 +1,5 @@
 #include "environment.hpp"
 
-#include <utility>
-
 namespace ast {
     bool Environment::is_generated(const std::string& sym) {
         return generated.count(sym) > 0;
@@ -15,7 +13,7 @@ namespace ast {
 
     void Environment::add_symbol(const std::string& sym, const std::string& typ, int kind) {
         if (table.count(sym) == 0) {
-            table.insert(std::make_pair(sym, std::make_pair(typ, kind)));
+            table.insert({sym, {typ, kind}});
         } else {
             throw DuplicateSymbol(sym, nullptr);
         }
@@ -39,5 +37,10 @@ namespace ast {
         } else {
             throw SymbolNotFound(sym, nullptr);
         }
+    }
+
+    void Environment::clear() {
+        this->table.clear();
+        this->generated.clear();
     }
 }

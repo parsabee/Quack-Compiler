@@ -23,39 +23,6 @@
  * every new (user-defined) scope will sit on top of this */
 #define GLOBAL "___global___"
 
-/*
- * error reporting facility
- */
-#define ERROR(OBJ) {\
-  std::stringstream msg;\
-  if (ex.get_node() != nullptr) {\
-      msg << "line " << ex.get_node()->get_line() << ":    " << ex.get_node()->get_signature();\
-  } else {\
-      msg << "line " << (OBJ)->get_line() << ":    " << (OBJ)->get_signature();\
-  }\
-  report::error(ex.what(), msg.str());\
-}
-
-/*
- * number _input_file a sequence
- */
-#define NUMBER(OUT, NUM) {      \
-  switch(NUM)                   \
-    {                           \
-    case 0:                     \
-      (OUT) << "1st";           \
-      break;                    \
-    case 1:                     \
-      (OUT) << "2nd";           \
-      break;                    \
-    case 2:                     \
-      (OUT) << "3rd";           \
-      break;                    \
-    default:                    \
-      (OUT) << (NUM)+1 << "th"; \
-    }                           \
-}
-
 
 namespace ast {
 
@@ -428,6 +395,7 @@ namespace ast {
     public:
         explicit Methods(int line_no) : Seq("Methods", line_no) {}
         void semantic_check(Stack &st) override ;
+        void code_gen(CodegenContext &ctx, Stack &st) override ;
     };
 
     class Statement : public ASTNode {
@@ -648,7 +616,7 @@ namespace ast {
             return _line_no;
         }
 
-        Block *getBody() const {
+        Block *get_body() const {
             return _body;
         }
 
@@ -671,8 +639,6 @@ namespace ast {
     };
 
     class Class : public ASTNode {
-        friend class ClassChecker;
-        friend class ClassGenerator;
         friend class Assign;
         friend class AssignDeclare;
 

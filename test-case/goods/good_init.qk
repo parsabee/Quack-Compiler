@@ -1,0 +1,7 @@
+class A(a : Int) {
+	if ( a > 0 ) {
+		this.a = a;
+	} else {
+		this.a = a * -1;
+	}
+}

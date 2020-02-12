@@ -2,6 +2,21 @@
 
 #include <utility>
 
+/*
+ * error reporting facility
+ * EX is an ast_exception
+ * OBJ is an ASTNode *
+ */
+#define ERROR(EX, OBJ) {\
+    std::stringstream msg;\
+    if ((EX).get_node() != nullptr) {\
+      msg << "line " << (EX).get_node()->get_line() << ":    " << (EX).get_node()->get_signature();\
+    } else {\
+      msg << "line " << (OBJ)->get_line() << ":    " << (OBJ)->get_signature();\
+    }\
+    report::error((EX).what(), msg.str());\
+}
+
 namespace ast {
 
     bool
@@ -34,7 +49,7 @@ namespace ast {
                 forward_ref(ctx, st, tmp->get_false(), "false");
             } else if (i->type() == WHILE) {
                 auto *tmp = dynamic_cast<While *>(i);
-                forward_ref(ctx, st, tmp->getBody(), "while");
+                forward_ref(ctx, st, tmp->get_body(), "while");
             }
         }
     }
@@ -116,7 +131,7 @@ namespace ast {
     void
     Program::code_gen(CodegenContext &ctx, Stack &st) {
 
-        /* preamble */
+        /* Preamble */
         ctx.emit( "/*\n"
                   " * MIT License\n"
                   " *\n"
@@ -143,8 +158,8 @@ namespace ast {
 
         /* Code Generation */
         ctx.emit("#include <stdlib.h>\n");
-        ctx.emit("#include \"builtins.h\"\n\n"); /* preamble */
-        if (_classes->len() > 5) /* 5 builtin classes */
+        ctx.emit("#include \"builtins.h\"\n\n");
+        if (_classes->len() > 0)
             ctx.emit("/* ======================= Class Declerations ======================= */\n\n");
 
         auto *global = new Environment(GLOBAL);
@@ -156,7 +171,7 @@ namespace ast {
             }
         }
         st.push(global);
-        if (_classes->len() > 5) /* 5 builtin classes */
+        if (_classes->len() > 0)
             ctx.emit("/* ======================= Class Definitions ======================== */\n\n");
 
         _classes->code_gen(ctx, st);
@@ -272,20 +287,18 @@ namespace ast {
                 throw TypeError("method doesn't return anything", this);
             }
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
     void
     Method::code_gen(CodegenContext &ctx, Stack &st) {
 
-        std::string str = st.top()->get_name();
-        auto symtable = new Environment(str + ":" + _name->get_text());
-        st.push(symtable);
-        std::string method_name = _owner + "_method_" + _name->get_text();
+        std::string env = st.top()->get_name();
+        std::string method_name = env.substr(0, env.find(':')) + "_method_" + _name->get_text();
         std::string return_type = _returns->get_text();
         std::stringstream ss;
-        ss << "( obj_" << _owner << " this";
+        ss << "obj_" << env.substr(0, env.find(':')) << " this";
         for (auto it: _formals->get_elements()) {
             ss << ", ";
             ss << "obj_" << it->get_type()->get_text() << " ";
@@ -294,16 +307,22 @@ namespace ast {
             st.top()->gen_symbol(it->get_var()->get_text());
             st.top()->add_symbol(it->get_var()->get_text(), it->get_type()->get_text(), STATIC);
         }
-        ss << " )";
-        ctx.emit("obj_" + return_type + " " + method_name + ss.str() + " {\n");
+        ctx.emit("obj_" + return_type + " " + method_name + "( " + ss.str() + " )" + " {\n");
         ctx.indent();
         _statements->code_gen(ctx, st);
-        if (_returns->get_text() == "Nothing") {
+
+        bool has_return = false;
+        for (auto &it: _statements->get_elements()) {
+            if (it->type() == RETURN) {
+                has_return = true;
+                break;
+            }
+        }
+        if (_returns->get_text() == "Nothing" && !has_return) {
             ctx.emit("return none;\n");
         }
         ctx.dedent();
         ctx.emit("}\n\n");
-        delete st.pop();
         ctx.resetReg();
     }
 
@@ -314,6 +333,15 @@ namespace ast {
             std::string environ = st.top()->get_name() + ":" + it->get_name();
             st.push(new Environment(environ));
             it->semantic_check(st);
+            delete st.pop();
+        }
+    }
+
+    void Methods::code_gen(CodegenContext &ctx, Stack &st) {
+        for (auto &it: _elements) {
+            std::string environ = st.top()->get_name() + ":" + it->get_name();
+            st.push(new Environment(environ));
+            it->code_gen(ctx, st);
             delete st.pop();
         }
     }
@@ -354,7 +382,7 @@ namespace ast {
                 st.update_symbol(ident->get_text(), rhs_type, NON_STATIC);
             }
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -422,7 +450,7 @@ namespace ast {
                 st.update_symbol(ident->get_text(), static_type, STATIC);
             }
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -485,7 +513,7 @@ namespace ast {
             }
         }
         catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -535,7 +563,7 @@ namespace ast {
             delete true_table;
             delete false_table;
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -604,7 +632,7 @@ namespace ast {
             _body->semantic_check(st);
             delete st.pop();
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -719,7 +747,7 @@ namespace ast {
         try {
             (void) type_check(st);
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -783,6 +811,42 @@ namespace ast {
         json_close(out, ctx);
     }
 
+    /*
+     * helper method to check if attribute is initialized on all paths
+     * attribute with it's ASTNode are added to 'attr_init'
+     */
+    static void
+    check_if_statements(Block *statements, std::unordered_map<std::string, Dot *> &attr_init, bool is_true, Class *cls) {
+        for (auto &i: statements->get_elements()) {
+            auto assign = dynamic_cast<Assign *>(i);
+            if (assign) {
+                auto dot = dynamic_cast<Dot *>(assign->get_left());
+                if (dot) {
+                    auto load = dynamic_cast<Load *>(dot->get_left());
+                    assert(load);
+                    auto ident = dynamic_cast<Ident *>(load->get_loc());
+                    if (ident) {
+                        if (ident->get_text() == "this") {
+                            if (!cls->has_attr(dot->get_right()->get_text())) {
+                                if (is_true) {
+                                    if (attr_init.count(dot->get_right()->get_text()) == 0) {
+                                        attr_init.insert({dot->get_right()->get_text(), dot});
+                                    } 
+                                } else {
+                                    if (attr_init.count(dot->get_right()->get_text()) > 0) {
+                                        attr_init.erase(attr_init.find(dot->get_right()->get_text()));
+                                    } else {
+                                        throw AttributeError("attribute not initialized on all paths", dot);
+                                    }
+                                }
+                            }
+                        }
+                    } 
+                }
+            }
+        }
+    }
+
     void
     Class::semantic_check(Stack &st) {
         /* ============================================
@@ -815,7 +879,35 @@ namespace ast {
 
             /* semantic checking the constructor */
             st.push (new Environment(get_name()));
-            _constructor->semantic_check(st);
+            _constructor->get_formals()->semantic_check(st);
+            /* checking attribute initialization on all paths */
+            for (auto &it : _constructor->get_statements()->get_elements()) {
+                if (it->type() == IF) {
+                    auto if_ = dynamic_cast<If *>(it);
+                    std::unordered_map<std::string, Dot *> attr_init;
+                    check_if_statements(if_->get_true(), attr_init, true, this);
+                    check_if_statements(if_->get_false(), attr_init, false, this);
+                    for (auto &i : attr_init) {
+                        try {
+                            throw AttributeError("attribute not initialized on all paths", i.second);
+                        } catch (AttributeError &ex) {
+                            ERROR(ex, this);
+                        }
+                    }
+                } else if (it->type() == WHILE) {
+                    auto while_ = dynamic_cast<While *>(it);
+                    std::unordered_map<std::string, Dot *> attr_init;
+                    check_if_statements(while_->get_body(), attr_init, true, this);
+                    for (auto &i : attr_init) {
+                        try {
+                            throw AttributeError("attribute not initialized on all paths", i.second);
+                        } catch (AttributeError &ex) {
+                            ERROR(ex, this);
+                        }
+                    }
+                }
+                it->semantic_check(st);
+            }
             delete st.pop();
 
             /* checking all attributes initialized */
@@ -851,12 +943,150 @@ namespace ast {
 
 
         } catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
+    }
+
+    static
+    void method_frequency(Class *cls, Stack &st, std::unordered_map<std::string, std::pair<std::string, int>> &map) {
+        /*
+         * static function
+         * counts the frequency of method overrides in a class hierarchy
+         * */
+        std::string super;
+        while(true) {
+            for (auto &it : cls->get_methods()->get_elements()) {
+                if (map.count(it->get_name()) == 0) {
+                    map.insert({it->get_name(), {cls->get_name() + "_method_" + it->get_name(), 1}});
+                } else {
+                    map.at(it->get_name()).second++;
+                }
+            }
+            super = cls->get_super();
+            if (super.empty())
+                break;
+            cls = st.get_class(super);
+        }
+    }
+
+    static
+    void topological_sort(Class *cls, Stack &st, std::vector<std::string> &method_table) {
+        std::unordered_map<std::string, std::pair<std::string, int>> method_count;
+        method_frequency(cls, st, method_count);
+        std::string super;
+        while(true) {
+            std::vector<std::string> tmp;
+            for (auto &it : cls->get_methods()->get_elements()) {
+                if (method_count[it->get_name()].second == 1) {
+                    tmp.insert(tmp.begin(), method_count[it->get_name()].first);
+                } else {
+                    method_count[it->get_name()].second--;
+                }
+            }
+            for (const auto &it: tmp) {
+                method_table.push_back(it);
+            }
+            super = cls->get_super();
+            if (super.empty())
+                break;
+            cls = st.get_class(super);
+        }
+    }
+
+    static void
+    generate_function_pointer(CodegenContext &ctx, Stack &st, std::string &name, Class *cls) {
+
+        std::string comment = "/* overridden or introduced */";
+        while (!cls->has_method(name)) {
+            cls = st.get_class(cls->get_super());
+            comment = "/* inherited */";
+        }
+        auto method = cls->get_method(name);
+        std::string sig = "obj_" + method->get_return() + " (*" + name + ")(obj_" + cls->get_name();
+        for (auto it: method->get_formals()->get_elements()) {
+            sig += ", ";
+            sig += "obj_" + it->get_type()->get_text();
+        }
+        sig += "); " + comment + "\n";
+        ctx.emit(sig);
+    }
+
+    static void
+    generate_method_table(CodegenContext &ctx, Stack &st, std::vector<std::string> &method_table, Class *cls) {
+        ctx.emit("struct class_" + cls->get_name() + "_struct {\n");
+        ctx.indent();
+        ctx.emit("class_" + cls->get_super() + "_super;\n\n");
+        ctx.emit("/* method table */\n");
+        std::string str;
+        str += "obj_" + cls->get_name() + " (*constructor)(";
+        bool first = true;
+        for (auto formal: cls->get_constructor()->get_formals()->get_elements()) {
+            if (!first) str += ", ";
+            first = false;
+            str += "obj_" + formal->get_type()->get_text();
+        }
+        if (first) str += "void";
+        str += ");\n";
+        ctx.emit(str);
+        for(auto it = method_table.rbegin(); it != method_table.rend(); it++) {
+            auto method_name = it->substr(it->find("_method_") + 8, it->length());
+            generate_function_pointer(ctx, st, method_name, cls);
+        }
+        ctx.dedent();
+        ctx.emit("};\n\n");
+    }
+
+    static void
+    generate_template(CodegenContext &ctx, Stack &st, std::vector<std::string> &method_table, Class *cls) {
+        ctx.emit("struct class_" + cls->get_name() + "_struct the_class_" + cls->get_name() + "_struct = {\n");
+        ctx.indent();
+        ctx.emit("&the_class_" + cls->get_super() + "_struct,\n");
+        std::string str = "new_" + cls->get_name();
+        for (auto it = method_table.rbegin(); it != method_table.rend(); it++) {
+            ctx.emit(str + ",\n");
+            str.clear();
+            str += *it;
+        }
+        ctx.emit(str + "\n");
+        ctx.dedent();
+        ctx.emit("};\n\n");
     }
 
     void
     Class::code_gen(CodegenContext &ctx, Stack &st) {
+        st.push(new Environment(get_name()));
+        std::vector<std::string> method_table;
+        topological_sort(this, st, method_table);
+        ctx.emit_obj_struct(get_name(), _attrs);
+        generate_method_table(ctx, st, method_table, this);
+        ctx.emit("extern class_" + get_name() + " the_class_" + get_name() + ";\n\n");
+        auto str = "obj_" + get_name() + " new_" + get_name() + "(";
+        bool first = true;
+        for (auto &it : _constructor->get_formals()->get_elements()) {
+            if (!first) str += ", ";
+            first = false;
+            str += "obj_" + it->get_type()->get_text() + " ";
+            str += ast::CodegenContext::gen_variable(it->get_var()->get_text());
+            st.top()->gen_symbol(it->get_var()->get_text());
+            st.top()->add_symbol(it->get_var()->get_text(), it->get_type()->get_text(), STATIC);
+        }
+        str += ") {\n";
+        ctx.emit("/**************\n * constructor\n **************/\n");
+        ctx.emit(str);
+        ctx.indent();
+        ctx.emit("obj_" + get_name() + " this = (obj_" + get_name() + ")malloc(sizeof(struct obj_" + get_name()
+        +"_struct));\n" );
+        ctx.emit("this->clazz = the_class_" + get_name() + ";\n");
+        _constructor->get_statements()->code_gen(ctx, st);
+        ctx.resetReg();
+        ctx.emit("return this;\n");
+        ctx.dedent();
+        ctx.emit("}\n\n");
+        st.top()->clear();
+        _methods->code_gen(ctx, st);
+        generate_template(ctx, st, method_table, this);
+        ctx.emit("class_" + get_name() + " the_class_" + get_name() + " = &the_class_" + get_name() + "_struct;\n\n");
+        delete st.pop();
     }
 
     void Class::update_attribute(const std::string &attr,
@@ -952,7 +1182,7 @@ namespace ast {
             }
         }
         catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -1052,7 +1282,7 @@ namespace ast {
             }
         }
         catch (ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 
@@ -1189,7 +1419,7 @@ namespace ast {
             (void) this->type_check(st);
         }
         catch (const ast_exception &ex) {
-            ERROR(this);
+            ERROR(ex, this);
         }
     }
 

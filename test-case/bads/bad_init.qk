@@ -1,0 +1,5 @@
+class A(a: Int) {
+	if a > 1 {
+		this.a = a;
+	}
+}

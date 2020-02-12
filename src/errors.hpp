@@ -155,7 +155,7 @@ namespace ast {
 
     struct ReservedWord : public ast_exception {
         ReservedWord(const std::string& wrd, ASTNode *obj)
-            : error("ReservedWord " + wrd), obj(obj) {}
+            : error("ReservedWord -- " + wrd), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();
@@ -170,7 +170,7 @@ namespace ast {
 
     struct AttributeError : public ast_exception {
         AttributeError(const std::string& wrd, ASTNode *obj)
-            : error("AttributeError " + wrd), obj(obj) {}
+            : error("AttributeError -- " + wrd), obj(obj) {}
 
         const char *what() const noexcept override {
             return error.c_str();

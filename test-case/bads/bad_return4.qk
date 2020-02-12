@@ -1,0 +1,4 @@
+class A(a: Int) {
+	this.a = a;
+	return A(a);
+}

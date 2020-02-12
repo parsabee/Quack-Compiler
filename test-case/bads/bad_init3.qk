@@ -1,0 +1,6 @@
+class A(a: Int) {
+	while(a > 0){
+		this.a = a;
+		a = a-1;
+	}
+}

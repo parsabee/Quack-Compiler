@@ -3,18 +3,14 @@
 
 #include <utility>
 
-
-#include <utility>
-
-
 #include "all.hpp"
 #include "errors.hpp"
 
 namespace ast {
     /* different kinds of symbol */
     enum kinds {
-        STATIC, /*constants*/
-        NON_STATIC, /*variables*/
+        STATIC,
+        NON_STATIC,
         TYPE
     };
 
@@ -26,6 +22,8 @@ namespace ast {
         std::string _name;
     public:
         explicit Environment(std::string name) : _name{std::move(std::move(name))} {}
+
+        void clear();
 
         bool is_generated(const std::string& sym);
 

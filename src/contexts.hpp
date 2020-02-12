@@ -38,7 +38,7 @@ namespace ast {
         void emit_class_sig(const std::string& cls);
 
         void emit_obj_struct(const std::string& cls,
-                             std::unordered_map<std::string, std::string> *attrs);
+                             std::unordered_map<std::string, std::pair<std::string, kinds>> *attrs);
 
         /* if variable is not already declared, generate the declaration */
         void declare_variable(const std::string& type, const std::string& var, Stack& st);

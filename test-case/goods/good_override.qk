@@ -1,0 +1,23 @@
+class A() {
+    def PRINT() {
+        "## A ##".PRINT();
+    }
+    def STR(): String{
+        return "## A ##";
+    }
+    def type(): String {
+        return "A";
+    }
+}
+
+class B() extends A {
+    def PRINT() {
+        "## B ##".PRINT();
+    }
+    def STR(): String{
+        return "## B ##";
+    }
+    def type(): String {
+        return "B";
+    }
+}

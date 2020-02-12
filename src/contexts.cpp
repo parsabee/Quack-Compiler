@@ -26,57 +26,85 @@ namespace ast {
     }
 
     void CodegenContext::emit_obj_struct(const std::string& cls,
-                                         std::unordered_map<std::string, std::string> *attrs) {
+                                         std::unordered_map<std::string, std::pair<std::string, kinds>> *attrs) {
         std::string str = cls + " definition";
         std::string stars = gen_stars(str);
         this->emit("/*" + stars + "\n * " + str + "\n " + stars + "*/\n");
         this->emit("struct obj_" + cls + "_struct {\n");
         this->emit("  struct class_" + cls + "_struct *clazz;\n");
         for (auto & attr : *attrs) {
-            this->emit("  obj_" + attr.second + " " + attr.first + ";\n");
+            this->emit("  obj_" + attr.second.first + " " + attr.first + ";\n");
         }
         this->emit("};\n\n");
     }
 
     std::string CodegenContext::gen_if() {
         std::stringstream ss;
-        ss << "cond___" << std::setw(3) << std::setfill('0') << _if++;
+        if ( _if > 999 ){
+            ss << "cond___" << _if++;
+        } else {
+            ss << "cond___" << std::setw(3) << std::setfill('0') << _if++;
+        }
         return ss.str();
     }
 
     std::string CodegenContext::gen_break() {
         std::stringstream ss;
-        ss << "break___" << std::setw(3) << std::setfill('0') << _break++;
+        if (_break > 999){
+            ss << "break___" << _break++;
+        } else {
+            ss << "break___" << std::setw(3) << std::setfill('0') << _break++;
+        }
         return ss.str();
     }
 
     std::string CodegenContext::gen_loop() {
         std::stringstream ss;
-        ss << "loop___" << std::setw(3) << std::setfill('0') << _loop++;
+        if (_loop > 999){
+            ss << "loop___" << _loop++;
+        } else {
+            ss << "loop___" << std::setw(3) << std::setfill('0') << _loop++;
+        }
         return ss.str();
     }
 
     std::string CodegenContext::gen_true() {
         std::stringstream ss;
-        ss << "true___" << std::setw(3) << std::setfill('0') << _true++;
+        if (_true > 999) {
+            ss << "true___" << _true++;
+        } else {
+            ss << "true___" << std::setw(3) << std::setfill('0') << _true++;
+        }
         return ss.str();
     }
 
     std::string CodegenContext::gen_false() {
         std::stringstream ss;
-        ss << "false___" << std::setw(3) << std::setfill('0') << _false++;
+        if (_false > 999) {
+            ss << "false___" << _false++;
+        } else {
+            ss << "false___" << std::setw(3) << std::setfill('0') << _false++;
+        }
         return ss.str();
     }
 
     std::string CodegenContext::gen_end() {
         std::stringstream ss;
-        ss << "endif___" << std::setw(3) << std::setfill('0') << _end++;
+        if (_end > 999) {
+            ss << "endif___" << _end;
+        } else {
+            ss << "endif___" << std::setw(3) << std::setfill('0') << _end++;
+        }
         return ss.str();
     }
 
     std::string CodegenContext::gen_temp() {
         std::stringstream ss;
-        ss << "tmp__" << std::setw(4) << std::setfill('0') << _reg++;
+        if (_reg > 999) {
+            ss << "tmp__" << _reg++;
+        } else {
+            ss << "tmp__" << std::setw(3) << std::setfill('0') << _reg++;
+        }
         return ss.str();
     }
 
@@ -88,7 +116,12 @@ namespace ast {
 
     std::string CodegenContext::get_last_temp(int n) {
         std::stringstream ss;
-        ss << "tmp__" << std::setw(4) << std::setfill('0') << _reg - n - 1;
+        int tmp = _reg - n - 1;
+        if (tmp > 999) {
+            ss << "tmp__" << tmp;
+        } else {
+            ss << "tmp__" << std::setw(3) << std::setfill('0') << tmp;
+        }
         return ss.str();
     }
 
