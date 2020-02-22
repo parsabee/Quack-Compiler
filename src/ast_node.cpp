@@ -286,6 +286,8 @@ namespace ast {
                   && !st.has_type(st.top()->get_name())) {
                 throw TypeError("method doesn't return anything", this);
             }
+            auto str = st.top()->get_name();
+            _owner = str.substr(0, str.find(':'));
         } catch (const ast_exception &ex) {
             ERROR(ex, this);
         }
@@ -676,6 +678,41 @@ namespace ast {
         json_close(out, ctx);
     }
 
+    void Typecase::semantic_check(Stack &st) {
+        _cases->semantic_check(st);
+    }
+
+    void Typecase::code_gen(CodegenContext &ctx, Stack &st) {
+        _expr->code_gen(ctx, st);
+        auto expr_reg = ctx.get_last_temp();
+
+        bool first = true;
+        for (auto &it: _cases->get_elements()) {
+            std::string str;
+            if (first) {
+                str += "if ";
+                first = false;
+            } else {
+                str += "else if ";
+            }
+            auto class_name = it->get_classname()->get_text();
+            auto var_name = it->get_ident()->get_text();
+            str += "( is_subtype( (class_Obj)(" + expr_reg + "->clazz), (class_Obj) the_class_" +
+                     class_name + ") ) {\n";
+            ctx.emit(str);
+            ctx.indent();
+            st.push(new Environment(st.top()->get_name()));
+            st.top()->add_symbol(var_name, class_name, NON_STATIC);
+            ctx.emit("obj_" + class_name + " " + ctx.gen_variable(var_name) +
+                     " = (obj_" + class_name + ")" + expr_reg + ";\n");
+            st.top()->gen_symbol(var_name);
+            it->get_block()->code_gen(ctx, st);
+            delete st.pop();
+            ctx.dedent();
+            ctx.emit("}\n");
+        }
+    }
+
     void
     Type_Alternative::json(std::ostream &out, PrintContext &ctx) {
         json_head("Type_Alternative", out, ctx);
@@ -683,6 +720,19 @@ namespace ast {
         json_child("classname_", _classname, out, ctx);
         json_child("block_", _block, out, ctx, ' ');
         json_close(out, ctx);
+    }
+
+    void Type_Alternative::semantic_check(Stack &st) {
+        try {
+            if (!st.has_type(_classname->get_text()))
+                throw TypeNotFound(_classname->get_text(), this);
+            st.push(new Environment(st.top()->get_name()));
+            st.top()->add_symbol(_ident->get_text(), _classname->get_text(), NON_STATIC);
+            _block->semantic_check(st);
+            delete st.pop();
+        } catch (ast_exception &ex) {
+            ERROR(ex, this);
+        }
     }
 
     void
@@ -1015,7 +1065,7 @@ namespace ast {
     generate_method_table(CodegenContext &ctx, Stack &st, std::vector<std::string> &method_table, Class *cls) {
         ctx.emit("struct class_" + cls->get_name() + "_struct {\n");
         ctx.indent();
-        ctx.emit("class_" + cls->get_super() + "_super;\n\n");
+        ctx.emit("class_" + cls->get_super() + " super_;\n\n");
         ctx.emit("/* method table */\n");
         std::string str;
         str += "obj_" + cls->get_name() + " (*constructor)(";
@@ -1239,7 +1289,7 @@ namespace ast {
         }
     }
 
-/* Convenience factory for operations like +, -, *, / */
+    /* Convenience factory for operations like +, -, *, / */
     Call *
     Call::binop(std::string opname, Expr *receiver, Expr *arg, int line_no) {
         auto *method = new Ident(std::move(opname), line_no);
@@ -1361,6 +1411,34 @@ namespace ast {
         json_close(out, ctx);
     }
 
+    void BinOp::semantic_check(Stack &st) {
+        try {
+            (void) type_check(st);
+        } catch (ast_exception &ex) {
+            ERROR(ex, this);
+        }
+    }
+
+    std::string BinOp::type_check(Stack &st) {
+        if (_left->type_check(st) != "Boolean") {
+            throw TypeError("left side of " + opsym + " not Boolean", this);
+        } else if (_right->type_check(st) != "Boolean") {
+            throw TypeError("right side of " + opsym + " not Boolean", this);
+        }
+        return "Boolean";
+    }
+
+    void BinOp::code_gen(CodegenContext &ctx, Stack &st) {
+        _left->code_gen(ctx, st);
+        auto left = ctx.get_last_temp();
+        _right->code_gen(ctx, st);
+        auto right = ctx.get_last_temp();
+        auto tmp = ctx.gen_temp();
+        auto op = opsym == "And" ? " && " : " || ";
+        ctx.emit("obj_Boolean " + tmp + " = new_Boolean();\n");
+        ctx.emit(tmp + "->value = " + left + "->value " + op + right + "->value;\n");
+    }
+
     void
     Not::json(std::ostream &out, PrintContext &ctx) {
         json_head("Not", out, ctx);
@@ -1384,8 +1462,7 @@ namespace ast {
          *  an attribute error
          * =============================================== */
 
-        std::string left_type;
-        left_type = _left->type_check(st);
+        auto left_type = _left->type_check(st);
         auto left_class = st.get_class(left_type);
         auto attr = _right->get_text();
         if (!left_class->has_attr(attr))

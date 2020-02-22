@@ -20,10 +20,6 @@ namespace ast {
     }
 
     void Stack::push(Environment *st) {
-        if (_size && st->get_name() == GLOBAL) {
-            std::cerr << "global scope being pushed twice!\n";
-            assert(false);
-        }
         _stack.push_back(st);
         _size++;
     }

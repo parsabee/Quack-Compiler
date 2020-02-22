@@ -309,7 +309,7 @@ namespace ast {
             if (_elements.size() != other.get_elements().size())
                 return false;
             for (int i = 0; i < _elements.size(); i++) {
-                if (_elements[i]->get_type() != other.get_elements()[i]->get_type())
+                if (_elements[i]->get_type()->get_text() != other.get_elements()[i]->get_type()->get_text())
                     return false;
             }
             return true;
@@ -804,6 +804,12 @@ namespace ast {
             return _line_no;
         }
 
+        Ident *get_ident() { return _ident; }
+
+        Ident *get_classname() { return _classname; }
+
+        Block *get_block() { return _block; }
+
         std::string type_check(Stack &st) override {
             std::cerr << "Type_Alternative: Nothing to be inferred\n";
             assert(false);
@@ -811,12 +817,12 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void semantic_check(Stack &st) override {}
+        void semantic_check(Stack &st) override;
 
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
         std::string get_signature() override {
-            return "";
+            return _ident->get_text() + ": " + _classname->get_text() + " { ...";
         }
 
         ~Type_Alternative() override {
@@ -849,9 +855,9 @@ namespace ast {
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void semantic_check(Stack &st) override {}
+        void semantic_check(Stack &st) override;
 
-        void code_gen(CodegenContext &ctx, Stack &st) override {}
+        void code_gen(CodegenContext &ctx, Stack &st) override;
 
         std::string get_signature() override {
             return "";
@@ -1030,15 +1036,13 @@ namespace ast {
             return _line_no;
         }
 
-        std::string type_check(Stack &st) override {
-            return "Boolean";
-        }
+        std::string type_check(Stack &st) override;
 
         void json(std::ostream &out, PrintContext &ctx) override;
 
-        void semantic_check(Stack &st) override {}
+        void semantic_check(Stack &st) override;
 
-        void code_gen(CodegenContext &ctx, Stack &st) override {}
+        void code_gen(CodegenContext &ctx, Stack &st) override;
 
         std::string get_signature() override {
             std::string sig;
@@ -1056,12 +1060,20 @@ namespace ast {
     public:
         explicit And(ASTNode *left, ASTNode *right, int line_no) :
                 BinOp("And", left, right, line_no) {}
+
+        int type() override {
+            return AND;
+        }
     };
 
     class Or : public BinOp {
     public:
         explicit Or(ASTNode *left, ASTNode *right, int line_no) :
                 BinOp("Or", left, right, line_no) {}
+
+        int type() override {
+            return OR;
+        }
     };
 
     class Not : public Expr {

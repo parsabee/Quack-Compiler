@@ -1,0 +1,5 @@
+a: Obj = 5;
+typecase a {
+    b: Int { b.PRINT(); }
+    c: Pt { c.PRINT(); }
+}

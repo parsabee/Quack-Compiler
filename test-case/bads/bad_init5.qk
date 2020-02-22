@@ -1,0 +1,4 @@
+class A(a: Int) {
+	this.a: Int = a;
+	this.a: Int = a;
+}

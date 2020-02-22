@@ -1,0 +1,24 @@
+class Pt2D(x: Int, y: Int) {
+    this.x = x;
+    this.y = y;
+
+    def STR(): String {
+        return "Pt2D(" + this.x.STR() + ", " + this.y.STR() + ")\n";
+    }
+
+    def PLUS(other: Pt2D): Pt2D {
+        return Pt2D(other.x + this.x, other.y + this.y);
+    }
+
+    def EQUALS(other: Obj): Boolean {
+        typecase other {
+            a: Pt2D { return a.x == this.x and a.y == this.y; }
+        }
+        return false;
+    }
+}
+
+a = Pt2D(10, 20);
+if (a == Pt2D(10, 20)) {
+    a.PRINT();
+}

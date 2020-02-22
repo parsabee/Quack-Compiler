@@ -1,0 +1,5 @@
+a: Obj = 10;
+typecase a {
+    b: Int { (b + 2).PRINT(); }
+    c: String { (c + "\n").PRINT(); }
+}
