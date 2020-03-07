@@ -730,7 +730,7 @@ namespace ast {
         std::string get_signature() override {
             std::string sig;
             sig += "class " + get_name() + "(" + _constructor->get_formals()->get_signature()
-                   + ") extends " + _super->get_signature();
+                   + ") extends " + _super->get_signature() + " { ... }";
             return sig;
         }
 
@@ -822,7 +822,7 @@ namespace ast {
         void code_gen(CodegenContext &ctx, Stack &st) override {}
 
         std::string get_signature() override {
-            return _ident->get_text() + ": " + _classname->get_text() + " { ...";
+            return _ident->get_text() + ": " + _classname->get_text() + " { ... }";
         }
 
         ~Type_Alternative() override {

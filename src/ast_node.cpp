@@ -62,19 +62,30 @@ namespace ast {
  * if t1 > t2:
  *    meaning if t2 is a subclass of t1
  */
+
+ //    bool
+ //    type_match (const std::string &t1, const std::string &t2, Stack &st) {
+ //        if (t1 == t2)
+ //            return true;
+ //        auto super = st.get_class(t2)->get_super(); /* might throw error */
+ //        while (!super.empty()) {
+ //            if (super == t1)
+ //                return true;
+ //            super = st.get_class(super)->get_super();
+ //        }
+ //        return false;
+ //    }
+    
+    /* cleaner recursive function */
     bool
     type_match (const std::string &t1, const std::string &t2, Stack &st) {
-        if (t1 == t2)
+        if (t1 == t2) {
             return true;
-        auto clss = st.get_class(t2); /* might throw error */
-        auto super = clss->get_super();
-        while (!super.empty()) {
-            clss = st.get_class(super);
-            if (super == t1)
-                return true;
-            super = clss->get_super();
+        } else if (t2.empty()) {
+            return false;
+        } else {
+            return type_match(t1, st.get_class(t2)->get_super(), st); /* might throw error */
         }
-        return false;
     }
 
 /* Indent to a given level */
@@ -199,7 +210,7 @@ namespace ast {
     }
 
     void Formal::code_gen(CodegenContext &ctx, Stack &st) {
-
+        return;
     }
 
     void
@@ -252,6 +263,33 @@ namespace ast {
         json_close(out, ctx);
     }
 
+    static bool
+    check_return_paths(Block *statements) {
+        /* 
+         * checking if return found on all paths
+         */
+        
+        bool found_return = false;
+        for (auto &it: statements->get_elements()) {
+            if (it->type() == RETURN) {
+                found_return = true;
+            }
+        }
+
+        if (!found_return) {
+            for (auto &it: statements->get_elements()) {
+                if (it->type() == IF) {
+                    auto _if_ = dynamic_cast<If *>(it);          /* checking if there is a return in both */
+                    if(check_return_paths(_if_->get_true()) &&   /* true part */
+                        check_return_paths(_if_->get_false())) { /* and false part */
+                        found_return = true;
+                    }
+                }
+            }
+        }
+        return found_return;
+    }
+
     void
     Method::semantic_check(Stack &st) {
         /* =============================================
@@ -271,19 +309,15 @@ namespace ast {
                 throw ReservedWord(get_name(), this);
             }
             st.assert_has_type(_returns->get_text());
-            _formals->semantic_check(st);
-            /* checking if it returns anything */
-            bool found_return = false;
             for (auto &it: _statements->get_elements()) {
-                if (it->type() == RETURN) {
-                    found_return = true;
-                }
                 it->semantic_check(st);
             }
-            /* if no return statement found, then method either has to be the constructor
-             * or it has to return Nothing type */
-            if (!found_return && _returns->get_text() != "Nothing"
-                  && !st.has_type(st.top()->get_name())) {
+
+            _formals->semantic_check(st);
+                                                          /* checking if it returns anything */
+                                                          /* if no return statement found then method either has to */
+            if (!check_return_paths(_statements) && _returns->get_text() != "Nothing"  /* has to be returning Nothing type */
+                  && !st.has_type(st.top()->get_name())) {                             /* or be the constructor */
                 throw TypeError("method doesn't return anything", this);
             }
             auto str = st.top()->get_name();
@@ -386,6 +420,17 @@ namespace ast {
         } catch (const ast_exception &ex) {
             ERROR(ex, this);
         }
+    }
+
+    static bool
+    is_declared(Stack &st, LExpr *lexpr) {
+        auto ident = dynamic_cast<Ident *>(lexpr);
+        if (ident) {
+            if (st.top()->has_symbol(ident->get_text())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     void
@@ -1225,8 +1270,8 @@ namespace ast {
                 throw TypeError("number of arguments passed don't match method's signature", this);
             }
             for (int i = 0; i < _actuals->get_elements().size(); i++) {
-                if (_actuals->get_elements()[i]->type_check(st) !=
-                    calling_method->get_formals()->get_elements()[i]->type_check(st)) {
+                if (!type_match(calling_method->get_formals()->get_elements()[i]->type_check(st), 
+                                _actuals->get_elements()[i]->type_check(st), st)) {
                     throw TypeError("type of arguments passed don't match method's signature", this);
                 }
             }
@@ -1325,8 +1370,8 @@ namespace ast {
                 throw TypeError("number of arguments passed don't match constructor's signature", this);
             }
             for (int i = 0; i < _actuals->get_elements().size(); i++) {
-                if (_actuals->get_elements()[i]->type_check(st) !=
-                constructor->get_formals()->get_elements()[i]->type_check(st)) {
+                if (!type_match(constructor->get_formals()->get_elements()[i]->type_check(st), 
+                                _actuals->get_elements()[i]->type_check(st), st)) {
                     throw TypeError("type of arguments passed don't match constructor's signature", this);
                 }
             }

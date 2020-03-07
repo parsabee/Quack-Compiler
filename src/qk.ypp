@@ -360,7 +360,7 @@ expr: expr '*' expr                 { $$ = ast::Call::binop("TIMES", $1, $3, @$.
     | expr ATLEAST expr             { $$ = ast::Call::binop("ATLEAST", $1, $3, @$.first_line); }
     | expr '>' expr                 { $$ = ast::Call::binop("MORE", $1, $3, @$.first_line); }
     | expr ATMOST expr              { $$ = ast::Call::binop("ATMOST", $1, $3, @$.first_line); }
-    | expr '<' expr                 { $$ = ast::Call::binop("MORE", $1, $3, @$.first_line); }
+    | expr '<' expr                 { $$ = ast::Call::binop("LESS", $1, $3, @$.first_line); }
     /* Boolean expressions are NOT syntactic sugar */
     | expr AND expr                 { $$ = new ast::And($1, $3, @$.first_line); }
     | expr OR expr                  { $$ = new ast::Or($1, $3, @$.first_line); }

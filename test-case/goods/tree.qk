@@ -1,22 +1,3 @@
-# Quack-Compiler
-a compiler for Quack, an object oriented statically typed language with type inference.
-Work in progress...
-
-### Build
-```
-mkdir build
-cd build
-cmake ..
-cmake --build .
-```
-### Execute
-```
-./qkc [-o output] <.qk input file> 
-```
-the generated `.c` file has to be linked with `builtins` library
-
-### What A Quack Program Looks Like
-```
 /* abstract node class */
 class Node() {
     def search(val: Int): Boolean {
@@ -65,4 +46,7 @@ class Inner(left: Node, right: Node, value: Int) extends Node {
         }
     }
 }
-```
+
+root: Node = Inner(Inner(Leaf(3), Leaf(5), 4), Inner(Leaf(7), Leaf(9), 8), 6);
+(root.STR() + "\n").PRINT();
+root.search(3).PRINT();

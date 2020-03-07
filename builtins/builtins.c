@@ -35,7 +35,7 @@ obj_Obj new_Obj() {
 /* Obj:STR */
 obj_String Obj_method_STR(obj_Obj this) {
   char * rep;
-  asprintf(&rep, "<Object at %08x>", (unsigned long)this);
+  asprintf(&rep, "<Object at %08x>", (unsigned int)this);
   obj_String str = str_literal(rep);
   return str;
 }

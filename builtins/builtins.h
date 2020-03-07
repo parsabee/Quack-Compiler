@@ -298,5 +298,6 @@ obj_Int Int_method_DIVIDE(obj_Int this, obj_Int other);
 obj_Int Int_method_TIMES(obj_Int this, obj_Int other);
 
 bool is_subtype(class_Obj obj, class_Obj other);
+void destroy(class_Obj obj);
 
 #endif
